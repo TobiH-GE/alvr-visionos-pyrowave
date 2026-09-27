@@ -1,0 +1,834 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		656A9FCF2F04031600D8DE2D /* ChaperoneSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 656A9FCE2F04031600D8DE2D /* ChaperoneSystem.swift */; };
+		8E1240FF2B7CC02E005B75F2 /* Entry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E1240FE2B7CC02E005B75F2 /* Entry.swift */; };
+		8E1241032B7CC0E1005B75F2 /* EntryControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E1241022B7CC0E1005B75F2 /* EntryControls.swift */; };
+		8E458AB32B7E05FB0019FC73 /* EventHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E458AB22B7E05FB0019FC73 /* EventHandler.swift */; };
+		8E458AB52B7E2C010019FC73 /* WorldTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E458AB42B7E2C010019FC73 /* WorldTracker.swift */; };
+		8E739C8B2B78990B0045ED16 /* ViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E739C8A2B78990A0045ED16 /* ViewModel.swift */; };
+		93F10375671142039BA634E8 /* PerformanceTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FDF7F3AB0664D5089D91DE3 /* PerformanceTracker.swift */; };
+		9ED257172B8062A2008DC22F /* Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ED257162B8062A1008DC22F /* Settings.swift */; };
+		C5E590322B6379ED00328ED6 /* ALVRClientApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5E590312B6379ED00328ED6 /* ALVRClientApp.swift */; };
+		C5E590362B6379ED00328ED6 /* Renderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5E590352B6379ED00328ED6 /* Renderer.swift */; };
+		C5E590382B6379ED00328ED6 /* Shaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = C5E590372B6379ED00328ED6 /* Shaders.metal */; };
+		C5E5903C2B6379ED00328ED6 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C5E5903B2B6379ED00328ED6 /* Preview Assets.xcassets */; };
+		C5E5903E2B6379EE00328ED6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C5E5903D2B6379EE00328ED6 /* Assets.xcassets */; };
+		D61E6FE02B71CE080076031A /* VideoHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = D61E6FDF2B71CE080076031A /* VideoHandler.swift */; };
+		D68FA8092B742F6F0052B7FF /* FFR.swift in Sources */ = {isa = PBXBuildFile; fileRef = D68FA8082B742F6F0052B7FF /* FFR.swift */; };
+		E702FBDC2B899B8700EE75D0 /* GlobalSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = E702FBDB2B899B8300EE75D0 /* GlobalSettings.swift */; };
+		E70C9AEA2C9377F50035B4F9 /* Codable.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70C9AE92C9377F20035B4F9 /* Codable.swift */; };
+		E71352CE2DF784C60079F12B /* GCController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E71352CD2DF784BF0079F12B /* GCController.swift */; };
+		E71DEF972C18D478008A2074 /* RealityKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = E71DEF932C18D325008A2074 /* RealityKit.swift */; };
+		E71DEF982C18D478008A2074 /* SwiftUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = E71DEF942C18D325008A2074 /* SwiftUI.swift */; };
+		E71DEF9A2C18D4B4008A2074 /* ALVRTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E71DEF992C18D4B4008A2074 /* ALVRTypes.swift */; };
+		E71DEF9C2C18D4DA008A2074 /* simd.swift in Sources */ = {isa = PBXBuildFile; fileRef = E71DEF9B2C18D4DA008A2074 /* simd.swift */; };
+		E71DEFA52C192617008A2074 /* ReplayKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E71DEFA42C192617008A2074 /* ReplayKit.framework */; };
+		E71DEFA82C192617008A2074 /* SampleHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = E71DEFA72C192617008A2074 /* SampleHandler.swift */; };
+		E71DEFAC2C192617008A2074 /* ALVREyeBroadcast.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E71DEFA32C192617008A2074 /* ALVREyeBroadcast.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		E72683DB2BE73DD10065B78B /* MetalClientSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = E72683DA2BE73DD10065B78B /* MetalClientSystem.swift */; };
+		E7285AAE2B9C44CB0032514C /* AVKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E7285AAD2B9C44CB0032514C /* AVKit.framework */; };
+		E769ABF22C1CE6D900E016CE /* ALVRClientCore.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = C588CC1F2B6BC7AA00D00DF0 /* ALVRClientCore.xcframework */; };
+		E769ABF32C1CE6D900E016CE /* ALVRClientCore.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C588CC1F2B6BC7AA00D00DF0 /* ALVRClientCore.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		E77BFB7F2EC975670072DCC5 /* Filters.swift in Sources */ = {isa = PBXBuildFile; fileRef = E77BFB7E2EC975640072DCC5 /* Filters.swift */; };
+		E77FDE582EC5D98200B0ED4F /* CameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E77FDE572EC5D97F00B0ED4F /* CameraView.swift */; };
+		E78D482D2EBA7508000F77D7 /* AV1Parser.swift in Sources */ = {isa = PBXBuildFile; fileRef = E78D482C2EBA7504000F77D7 /* AV1Parser.swift */; };
+		E78D482F2EBA76BB000F77D7 /* NALParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = E78D482E2EBA76B8000F77D7 /* NALParser.swift */; };
+		E7A11A0200000000000000A2 /* InputTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7A11A0100000000000000A1 /* InputTypes.swift */; };
+		E7A11A0400000000000000A4 /* SteamControllerDevice.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7A11A0300000000000000A3 /* SteamControllerDevice.swift */; };
+		E7A11A0700000000000000A7 /* InteractionProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7A11A0600000000000000A6 /* InteractionProfile.swift */; };
+		E7A11A0900000000000000A9 /* InputSink.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7A11A0800000000000000A8 /* InputSink.swift */; };
+		E7A11A0B00000000000000AB /* InputDebugView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7A11A0A00000000000000AA /* InputDebugView.swift */; };
+		E7A11A0D00000000000000AD /* IbexModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7A11A0C00000000000000AC /* IbexModel.swift */; };
+		E7A11A0F00000000000000AF /* ControllerPoseFuser.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7A11A0E00000000000000AE /* ControllerPoseFuser.swift */; };
+		E7A11A1100000000000000B1 /* ibex_ev1.mesh in Resources */ = {isa = PBXBuildFile; fileRef = E7A11A1000000000000000B0 /* ibex_ev1.mesh */; };
+		E7A11A1300000000000000B3 /* ComponentProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7A11A1200000000000000B2 /* ComponentProbe.swift */; };
+		E7A98A9E2BE2EEAB003DF333 /* DummyMetalRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7A98A9D2BE2EEA5003DF333 /* DummyMetalRenderer.swift */; };
+		E7A98AA02BE2EEEA003DF333 /* RealityKitClientSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7A98A9F2BE2EEEA003DF333 /* RealityKitClientSystem.swift */; };
+		E7AC9193873D48A2B7122E11 /* PerformanceOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BD00478C3614F7DB55D935E /* PerformanceOverlayView.swift */; };
+		E7D606032C1B5D39009E3343 /* RealityKitEyeTrackingSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7D606022C1B5D37009E3343 /* RealityKitEyeTrackingSystem.swift */; };
+		E7D606052C1B646D009E3343 /* EyeTrackingMats.usda in Resources */ = {isa = PBXBuildFile; fileRef = E7D606042C1B646D009E3343 /* EyeTrackingMats.usda */; };
+		E7F222422BE2F03800D10191 /* RealityKitClientView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7F222412BE2F03800D10191 /* RealityKitClientView.swift */; };
+		E7F222442BE2F21600D10191 /* SBSMaterial.usda in Resources */ = {isa = PBXBuildFile; fileRef = E7F222432BE2F21600D10191 /* SBSMaterial.usda */; };
+		507957410000000000000002 /* PyroWaveDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 507957410000000000000001 /* PyroWaveDecoder.swift */; };
+		507957410000000000000006 /* pyrowave_common.mm in Sources */ = {isa = PBXBuildFile; fileRef = 507957410000000000000005 /* pyrowave_common.mm */; };
+		507957410000000000000008 /* pyrowave_decoder.mm in Sources */ = {isa = PBXBuildFile; fileRef = 507957410000000000000007 /* pyrowave_decoder.mm */; };
+		50795741000000000000000A /* pyrowave_encoder.mm in Sources */ = {isa = PBXBuildFile; fileRef = 507957410000000000000009 /* pyrowave_encoder.mm */; };
+		50795741000000000000000D /* pyrowave_bitstream.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50795741000000000000000C /* pyrowave_bitstream.cpp */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		E71DEFAA2C192617008A2074 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C5E590222B6379ED00328ED6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E71DEFA22C192617008A2074;
+			remoteInfo = ALVREyeBroadcast;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		E71DEFB02C192617008A2074 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				E71DEFAC2C192617008A2074 /* ALVREyeBroadcast.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E769ABF42C1CE6D900E016CE /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				E769ABF32C1CE6D900E016CE /* ALVRClientCore.xcframework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		0FDF7F3AB0664D5089D91DE3 /* PerformanceTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceTracker.swift; sourceTree = "<group>"; };
+		5BD00478C3614F7DB55D935E /* PerformanceOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceOverlayView.swift; sourceTree = "<group>"; };
+		656A9FCE2F04031600D8DE2D /* ChaperoneSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChaperoneSystem.swift; sourceTree = "<group>"; };
+		8E1240FE2B7CC02E005B75F2 /* Entry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Entry.swift; sourceTree = "<group>"; };
+		8E1241022B7CC0E1005B75F2 /* EntryControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryControls.swift; sourceTree = "<group>"; };
+		8E458AB22B7E05FB0019FC73 /* EventHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventHandler.swift; sourceTree = "<group>"; };
+		8E458AB42B7E2C010019FC73 /* WorldTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldTracker.swift; sourceTree = "<group>"; };
+		8E739C8A2B78990A0045ED16 /* ViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewModel.swift; sourceTree = "<group>"; };
+		9ED257162B8062A1008DC22F /* Settings.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Settings.swift; sourceTree = "<group>"; };
+		C588CC1F2B6BC7AA00D00DF0 /* ALVRClientCore.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = ALVRClientCore.xcframework; path = ALVRClient/ALVRClientCore.xcframework; sourceTree = SOURCE_ROOT; };
+		C5E5902A2B6379ED00328ED6 /* ALVRClient.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ALVRClient.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C5E590312B6379ED00328ED6 /* ALVRClientApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ALVRClientApp.swift; sourceTree = "<group>"; };
+		C5E590352B6379ED00328ED6 /* Renderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Renderer.swift; sourceTree = "<group>"; };
+		C5E590372B6379ED00328ED6 /* Shaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = Shaders.metal; sourceTree = "<group>"; };
+		C5E590392B6379ED00328ED6 /* ShaderTypes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ShaderTypes.h; sourceTree = "<group>"; };
+		C5E5903B2B6379ED00328ED6 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		C5E5903D2B6379EE00328ED6 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		C5E5903F2B6379EE00328ED6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		C5E590492B637C7E00328ED6 /* ALVRClient-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "ALVRClient-Bridging-Header.h"; sourceTree = "<group>"; };
+		D61E6FDF2B71CE080076031A /* VideoHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoHandler.swift; sourceTree = "<group>"; };
+		D68FA8042B73D5DD0052B7FF /* ALVRClient.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = ALVRClient.xcconfig; sourceTree = "<group>"; };
+		D68FA8052B73D6260052B7FF /* Override.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Override.xcconfig; sourceTree = "<group>"; };
+		D68FA8082B742F6F0052B7FF /* FFR.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFR.swift; sourceTree = "<group>"; };
+		E702FBDB2B899B8300EE75D0 /* GlobalSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalSettings.swift; sourceTree = "<group>"; };
+		E70C9AE92C9377F20035B4F9 /* Codable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Codable.swift; sourceTree = "<group>"; };
+		E71352CD2DF784BF0079F12B /* GCController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GCController.swift; sourceTree = "<group>"; };
+		E71DEF932C18D325008A2074 /* RealityKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealityKit.swift; sourceTree = "<group>"; };
+		E71DEF942C18D325008A2074 /* SwiftUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftUI.swift; sourceTree = "<group>"; };
+		E71DEF992C18D4B4008A2074 /* ALVRTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ALVRTypes.swift; sourceTree = "<group>"; };
+		E71DEF9B2C18D4DA008A2074 /* simd.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = simd.swift; sourceTree = "<group>"; };
+		E71DEFA32C192617008A2074 /* ALVREyeBroadcast.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ALVREyeBroadcast.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		E71DEFA42C192617008A2074 /* ReplayKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ReplayKit.framework; path = System/Library/Frameworks/ReplayKit.framework; sourceTree = SDKROOT; };
+		E71DEFA72C192617008A2074 /* SampleHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleHandler.swift; sourceTree = "<group>"; };
+		E71DEFA92C192617008A2074 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		E71DEFB12C192627008A2074 /* ALVREyeBroadcast.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ALVREyeBroadcast.entitlements; sourceTree = "<group>"; };
+		E71DEFB22C19263D008A2074 /* ALVRClient.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ALVRClient.entitlements; sourceTree = "<group>"; };
+		E72683DA2BE73DD10065B78B /* MetalClientSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalClientSystem.swift; sourceTree = "<group>"; };
+		E7285AAD2B9C44CB0032514C /* AVKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVKit.framework; path = System/Library/Frameworks/AVKit.framework; sourceTree = SDKROOT; };
+		E77BFB7E2EC975640072DCC5 /* Filters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Filters.swift; sourceTree = "<group>"; };
+		E77FDE572EC5D97F00B0ED4F /* CameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraView.swift; sourceTree = "<group>"; };
+		E78D482C2EBA7504000F77D7 /* AV1Parser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AV1Parser.swift; sourceTree = "<group>"; };
+		E78D482E2EBA76B8000F77D7 /* NALParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NALParser.swift; sourceTree = "<group>"; };
+		E7A11A0100000000000000A1 /* InputTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputTypes.swift; sourceTree = "<group>"; };
+		E7A11A0300000000000000A3 /* SteamControllerDevice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamControllerDevice.swift; sourceTree = "<group>"; };
+		E7A11A0600000000000000A6 /* InteractionProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractionProfile.swift; sourceTree = "<group>"; };
+		E7A11A0800000000000000A8 /* InputSink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputSink.swift; sourceTree = "<group>"; };
+		E7A11A0A00000000000000AA /* InputDebugView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputDebugView.swift; sourceTree = "<group>"; };
+		E7A11A0C00000000000000AC /* IbexModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IbexModel.swift; sourceTree = "<group>"; };
+		E7A11A0E00000000000000AE /* ControllerPoseFuser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControllerPoseFuser.swift; sourceTree = "<group>"; };
+		E7A11A1000000000000000B0 /* ibex_ev1.mesh */ = {isa = PBXFileReference; lastKnownFileType = file; path = ibex_ev1.mesh; sourceTree = "<group>"; };
+		E7A11A1200000000000000B2 /* ComponentProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComponentProbe.swift; sourceTree = "<group>"; };
+		E7A98A9D2BE2EEA5003DF333 /* DummyMetalRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DummyMetalRenderer.swift; sourceTree = "<group>"; };
+		E7A98A9F2BE2EEEA003DF333 /* RealityKitClientSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealityKitClientSystem.swift; sourceTree = "<group>"; };
+		E7B122A42C24C7CB005E2758 /* AppStore.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = AppStore.xcconfig; sourceTree = "<group>"; };
+		E7B122A52C24C7FD005E2758 /* Testflight.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Testflight.xcconfig; sourceTree = "<group>"; };
+		E7D606022C1B5D37009E3343 /* RealityKitEyeTrackingSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealityKitEyeTrackingSystem.swift; sourceTree = "<group>"; };
+		E7D606042C1B646D009E3343 /* EyeTrackingMats.usda */ = {isa = PBXFileReference; lastKnownFileType = text; path = EyeTrackingMats.usda; sourceTree = "<group>"; };
+		E7F222412BE2F03800D10191 /* RealityKitClientView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealityKitClientView.swift; sourceTree = "<group>"; };
+		E7F222432BE2F21600D10191 /* SBSMaterial.usda */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = SBSMaterial.usda; sourceTree = "<group>"; };
+		507957410000000000000001 /* PyroWaveDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PyroWaveDecoder.swift; sourceTree = "<group>"; };
+		507957410000000000000003 /* pyrowave_metal.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = pyrowave_metal.h; sourceTree = "<group>"; };
+		507957410000000000000004 /* pyrowave_common.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = pyrowave_common.hpp; sourceTree = "<group>"; };
+		507957410000000000000005 /* pyrowave_common.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = pyrowave_common.mm; sourceTree = "<group>"; };
+		507957410000000000000007 /* pyrowave_decoder.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = pyrowave_decoder.mm; sourceTree = "<group>"; };
+		507957410000000000000009 /* pyrowave_encoder.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = pyrowave_encoder.mm; sourceTree = "<group>"; };
+		50795741000000000000000B /* pyrowave_bitstream.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = pyrowave_bitstream.hpp; sourceTree = "<group>"; };
+		50795741000000000000000C /* pyrowave_bitstream.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = pyrowave_bitstream.cpp; sourceTree = "<group>"; };
+		50795741000000000000000E /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
+		50795741000000000000000F /* UPSTREAM-README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = UPSTREAM-README.md; sourceTree = "<group>"; };
+		507957410000000000000010 /* VENDORED.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = VENDORED.md; sourceTree = "<group>"; };
+		507957410000000000000011 /* pyrowave_msl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = pyrowave_msl.h; sourceTree = "<group>"; };
+		507957410000000000000012 /* pyrowave_stripes.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = pyrowave_stripes.hpp; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		C5E590272B6379ED00328ED6 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E769ABF22C1CE6D900E016CE /* ALVRClientCore.xcframework in Frameworks */,
+				E7285AAE2B9C44CB0032514C /* AVKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E71DEFA02C192617008A2074 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E71DEFA52C192617008A2074 /* ReplayKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		8E1240FD2B7CC021005B75F2 /* Entry */ = {
+			isa = PBXGroup;
+			children = (
+				8E1240FE2B7CC02E005B75F2 /* Entry.swift */,
+				8E1241022B7CC0E1005B75F2 /* EntryControls.swift */,
+			);
+			path = Entry;
+			sourceTree = "<group>";
+		};
+		8E739C892B7898EC0045ED16 /* Model */ = {
+			isa = PBXGroup;
+			children = (
+				8E739C8A2B78990A0045ED16 /* ViewModel.swift */,
+			);
+			path = Model;
+			sourceTree = "<group>";
+		};
+		C5E590212B6379ED00328ED6 = {
+			isa = PBXGroup;
+			children = (
+				D68FA8042B73D5DD0052B7FF /* ALVRClient.xcconfig */,
+				D68FA8052B73D6260052B7FF /* Override.xcconfig */,
+				E7B122A42C24C7CB005E2758 /* AppStore.xcconfig */,
+				E7B122A52C24C7FD005E2758 /* Testflight.xcconfig */,
+				C5E5902C2B6379ED00328ED6 /* ALVRClient */,
+				E71DEFA62C192617008A2074 /* ALVREyeBroadcast */,
+				C5E5902B2B6379ED00328ED6 /* Products */,
+				E7285AAC2B9C44CB0032514C /* Frameworks */,
+			);
+			sourceTree = "<group>";
+		};
+		C5E5902B2B6379ED00328ED6 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				C5E5902A2B6379ED00328ED6 /* ALVRClient.app */,
+				E71DEFA32C192617008A2074 /* ALVREyeBroadcast.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		C5E5902C2B6379ED00328ED6 /* ALVRClient */ = {
+			isa = PBXGroup;
+			children = (
+				E71DEFB22C19263D008A2074 /* ALVRClient.entitlements */,
+				E71DEF962C18D425008A2074 /* Extensions */,
+				E7A11A0500000000000000A5 /* Input */,
+				8E1240FD2B7CC021005B75F2 /* Entry */,
+				8E739C892B7898EC0045ED16 /* Model */,
+				C5E590492B637C7E00328ED6 /* ALVRClient-Bridging-Header.h */,
+				C5E5903D2B6379EE00328ED6 /* Assets.xcassets */,
+				C588CC1F2B6BC7AA00D00DF0 /* ALVRClientCore.xcframework */,
+				C5E5903F2B6379EE00328ED6 /* Info.plist */,
+				E7F222432BE2F21600D10191 /* SBSMaterial.usda */,
+				E7D606042C1B646D009E3343 /* EyeTrackingMats.usda */,
+				C5E590312B6379ED00328ED6 /* ALVRClientApp.swift */,
+				E7A98A9D2BE2EEA5003DF333 /* DummyMetalRenderer.swift */,
+				8E458AB22B7E05FB0019FC73 /* EventHandler.swift */,
+				E77FDE572EC5D97F00B0ED4F /* CameraView.swift */,
+				D68FA8082B742F6F0052B7FF /* FFR.swift */,
+				E702FBDB2B899B8300EE75D0 /* GlobalSettings.swift */,
+				0FDF7F3AB0664D5089D91DE3 /* PerformanceTracker.swift */,
+				5BD00478C3614F7DB55D935E /* PerformanceOverlayView.swift */,
+				E72683DA2BE73DD10065B78B /* MetalClientSystem.swift */,
+				E7A98A9F2BE2EEEA003DF333 /* RealityKitClientSystem.swift */,
+				E7F222412BE2F03800D10191 /* RealityKitClientView.swift */,
+				E7D606022C1B5D37009E3343 /* RealityKitEyeTrackingSystem.swift */,
+				C5E590352B6379ED00328ED6 /* Renderer.swift */,
+				9ED257162B8062A1008DC22F /* Settings.swift */,
+				C5E590372B6379ED00328ED6 /* Shaders.metal */,
+				C5E590392B6379ED00328ED6 /* ShaderTypes.h */,
+				D61E6FDF2B71CE080076031A /* VideoHandler.swift */,
+				507957410000000000000001 /* PyroWaveDecoder.swift */,
+				507957410000000000000100 /* PyroWave */,
+				E78D482C2EBA7504000F77D7 /* AV1Parser.swift */,
+				E78D482E2EBA76B8000F77D7 /* NALParser.swift */,
+				8E458AB42B7E2C010019FC73 /* WorldTracker.swift */,
+				C5E5903A2B6379ED00328ED6 /* Preview Content */,
+				656A9FCE2F04031600D8DE2D /* ChaperoneSystem.swift */,
+			);
+			path = ALVRClient;
+			sourceTree = "<group>";
+		};
+		C5E5903A2B6379ED00328ED6 /* Preview Content */ = {
+			isa = PBXGroup;
+			children = (
+				C5E5903B2B6379ED00328ED6 /* Preview Assets.xcassets */,
+			);
+			path = "Preview Content";
+			sourceTree = "<group>";
+		};
+		E71DEF962C18D425008A2074 /* Extensions */ = {
+			isa = PBXGroup;
+			children = (
+				E77BFB7E2EC975640072DCC5 /* Filters.swift */,
+				E71352CD2DF784BF0079F12B /* GCController.swift */,
+				E70C9AE92C9377F20035B4F9 /* Codable.swift */,
+				E71DEF932C18D325008A2074 /* RealityKit.swift */,
+				E71DEF942C18D325008A2074 /* SwiftUI.swift */,
+				E71DEF992C18D4B4008A2074 /* ALVRTypes.swift */,
+				E71DEF9B2C18D4DA008A2074 /* simd.swift */,
+			);
+			path = Extensions;
+			sourceTree = "<group>";
+		};
+		E71DEFA62C192617008A2074 /* ALVREyeBroadcast */ = {
+			isa = PBXGroup;
+			children = (
+				E71DEFB12C192627008A2074 /* ALVREyeBroadcast.entitlements */,
+				E71DEFA72C192617008A2074 /* SampleHandler.swift */,
+				E71DEFA92C192617008A2074 /* Info.plist */,
+			);
+			path = ALVREyeBroadcast;
+			sourceTree = "<group>";
+		};
+		E7285AAC2B9C44CB0032514C /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				E7285AAD2B9C44CB0032514C /* AVKit.framework */,
+				E71DEFA42C192617008A2074 /* ReplayKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		E7A11A0500000000000000A5 /* Input */ = {
+			isa = PBXGroup;
+			children = (
+				E7A11A0100000000000000A1 /* InputTypes.swift */,
+				E7A11A0300000000000000A3 /* SteamControllerDevice.swift */,
+				E7A11A0600000000000000A6 /* InteractionProfile.swift */,
+				E7A11A0800000000000000A8 /* InputSink.swift */,
+				E7A11A0A00000000000000AA /* InputDebugView.swift */,
+				E7A11A0C00000000000000AC /* IbexModel.swift */,
+				E7A11A0E00000000000000AE /* ControllerPoseFuser.swift */,
+				E7A11A1200000000000000B2 /* ComponentProbe.swift */,
+				E7A11A1000000000000000B0 /* ibex_ev1.mesh */,
+			);
+			path = Input;
+			sourceTree = "<group>";
+		};
+		507957410000000000000100 /* PyroWave */ = {
+			isa = PBXGroup;
+			children = (
+				507957410000000000000003 /* pyrowave_metal.h */,
+				507957410000000000000004 /* pyrowave_common.hpp */,
+				507957410000000000000005 /* pyrowave_common.mm */,
+				507957410000000000000007 /* pyrowave_decoder.mm */,
+				507957410000000000000009 /* pyrowave_encoder.mm */,
+				50795741000000000000000B /* pyrowave_bitstream.hpp */,
+				50795741000000000000000C /* pyrowave_bitstream.cpp */,
+				507957410000000000000012 /* pyrowave_stripes.hpp */,
+				50795741000000000000000E /* LICENSE */,
+				50795741000000000000000F /* UPSTREAM-README.md */,
+				507957410000000000000010 /* VENDORED.md */,
+				507957410000000000000101 /* shaders */,
+			);
+			path = PyroWave;
+			sourceTree = "<group>";
+		};
+		507957410000000000000101 /* shaders */ = {
+			isa = PBXGroup;
+			children = (
+				507957410000000000000011 /* pyrowave_msl.h */,
+			);
+			path = shaders;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		C5E590292B6379ED00328ED6 /* ALVRClient */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C5E590422B6379EE00328ED6 /* Build configuration list for PBXNativeTarget "ALVRClient" */;
+			buildPhases = (
+				C5E590262B6379ED00328ED6 /* Sources */,
+				C5E590272B6379ED00328ED6 /* Frameworks */,
+				C5E590282B6379ED00328ED6 /* Resources */,
+				E71DEFB02C192617008A2074 /* Embed Foundation Extensions */,
+				E769ABF42C1CE6D900E016CE /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E71DEFAB2C192617008A2074 /* PBXTargetDependency */,
+			);
+			name = ALVRClient;
+			packageProductDependencies = (
+			);
+			productName = ALVRClient;
+			productReference = C5E5902A2B6379ED00328ED6 /* ALVRClient.app */;
+			productType = "com.apple.product-type.application";
+		};
+		E71DEFA22C192617008A2074 /* ALVREyeBroadcast */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E71DEFAD2C192617008A2074 /* Build configuration list for PBXNativeTarget "ALVREyeBroadcast" */;
+			buildPhases = (
+				E71DEF9F2C192617008A2074 /* Sources */,
+				E71DEFA02C192617008A2074 /* Frameworks */,
+				E71DEFA12C192617008A2074 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ALVREyeBroadcast;
+			productName = ALVREyeBroadcast;
+			productReference = E71DEFA32C192617008A2074 /* ALVREyeBroadcast.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		C5E590222B6379ED00328ED6 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1530;
+				TargetAttributes = {
+					C5E590292B6379ED00328ED6 = {
+						CreatedOnToolsVersion = 15.3;
+					};
+					E71DEFA22C192617008A2074 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+				};
+			};
+			buildConfigurationList = C5E590252B6379ED00328ED6 /* Build configuration list for PBXProject "ALVRClient" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = C5E590212B6379ED00328ED6;
+			packageReferences = (
+			);
+			productRefGroup = C5E5902B2B6379ED00328ED6 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				C5E590292B6379ED00328ED6 /* ALVRClient */,
+				E71DEFA22C192617008A2074 /* ALVREyeBroadcast */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		C5E590282B6379ED00328ED6 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C5E5903E2B6379EE00328ED6 /* Assets.xcassets in Resources */,
+				E7F222442BE2F21600D10191 /* SBSMaterial.usda in Resources */,
+				E7D606052C1B646D009E3343 /* EyeTrackingMats.usda in Resources */,
+				C5E5903C2B6379ED00328ED6 /* Preview Assets.xcassets in Resources */,
+				E7A11A1100000000000000B1 /* ibex_ev1.mesh in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E71DEFA12C192617008A2074 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		C5E590262B6379ED00328ED6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E71DEF972C18D478008A2074 /* RealityKit.swift in Sources */,
+				E71DEF982C18D478008A2074 /* SwiftUI.swift in Sources */,
+				8E458AB52B7E2C010019FC73 /* WorldTracker.swift in Sources */,
+				E7F222422BE2F03800D10191 /* RealityKitClientView.swift in Sources */,
+				C5E590382B6379ED00328ED6 /* Shaders.metal in Sources */,
+				E7A98AA02BE2EEEA003DF333 /* RealityKitClientSystem.swift in Sources */,
+				E77BFB7F2EC975670072DCC5 /* Filters.swift in Sources */,
+				E70C9AEA2C9377F50035B4F9 /* Codable.swift in Sources */,
+				D61E6FE02B71CE080076031A /* VideoHandler.swift in Sources */,
+				507957410000000000000002 /* PyroWaveDecoder.swift in Sources */,
+				507957410000000000000006 /* pyrowave_common.mm in Sources */,
+				507957410000000000000008 /* pyrowave_decoder.mm in Sources */,
+				50795741000000000000000A /* pyrowave_encoder.mm in Sources */,
+				50795741000000000000000D /* pyrowave_bitstream.cpp in Sources */,
+				8E458AB32B7E05FB0019FC73 /* EventHandler.swift in Sources */,
+				8E1240FF2B7CC02E005B75F2 /* Entry.swift in Sources */,
+				E7A98A9E2BE2EEAB003DF333 /* DummyMetalRenderer.swift in Sources */,
+				E71DEF9A2C18D4B4008A2074 /* ALVRTypes.swift in Sources */,
+				E702FBDC2B899B8700EE75D0 /* GlobalSettings.swift in Sources */,
+				93F10375671142039BA634E8 /* PerformanceTracker.swift in Sources */,
+				E7AC9193873D48A2B7122E11 /* PerformanceOverlayView.swift in Sources */,
+				E72683DB2BE73DD10065B78B /* MetalClientSystem.swift in Sources */,
+				8E1241032B7CC0E1005B75F2 /* EntryControls.swift in Sources */,
+				E77FDE582EC5D98200B0ED4F /* CameraView.swift in Sources */,
+				D68FA8092B742F6F0052B7FF /* FFR.swift in Sources */,
+				9ED257172B8062A2008DC22F /* Settings.swift in Sources */,
+				C5E590362B6379ED00328ED6 /* Renderer.swift in Sources */,
+				C5E590322B6379ED00328ED6 /* ALVRClientApp.swift in Sources */,
+				E7D606032C1B5D39009E3343 /* RealityKitEyeTrackingSystem.swift in Sources */,
+				E71DEF9C2C18D4DA008A2074 /* simd.swift in Sources */,
+				E78D482F2EBA76BB000F77D7 /* NALParser.swift in Sources */,
+				E71352CE2DF784C60079F12B /* GCController.swift in Sources */,
+				E7A11A0200000000000000A2 /* InputTypes.swift in Sources */,
+				E7A11A0400000000000000A4 /* SteamControllerDevice.swift in Sources */,
+				E7A11A0700000000000000A7 /* InteractionProfile.swift in Sources */,
+				E7A11A0900000000000000A9 /* InputSink.swift in Sources */,
+				E7A11A0B00000000000000AB /* InputDebugView.swift in Sources */,
+				E7A11A0D00000000000000AD /* IbexModel.swift in Sources */,
+				E7A11A0F00000000000000AF /* ControllerPoseFuser.swift in Sources */,
+				E7A11A1300000000000000B3 /* ComponentProbe.swift in Sources */,
+				8E739C8B2B78990B0045ED16 /* ViewModel.swift in Sources */,
+				656A9FCF2F04031600D8DE2D /* ChaperoneSystem.swift in Sources */,
+				E78D482D2EBA7508000F77D7 /* AV1Parser.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E71DEF9F2C192617008A2074 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E71DEFA82C192617008A2074 /* SampleHandler.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		E71DEFAB2C192617008A2074 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E71DEFA22C192617008A2074 /* ALVREyeBroadcast */;
+			targetProxy = E71DEFAA2C192617008A2074 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		C5E590402B6379EE00328ED6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = s;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				MTL_MATH_MODE = FAST;
+				MTL_OPTIMIZATION_LEVEL = s;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = xros;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				XROS_DEPLOYMENT_TARGET = 1.1;
+			};
+			name = Debug;
+		};
+		C5E590412B6379EE00328ED6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				MTL_MATH_MODE = FAST;
+				MTL_OPTIMIZATION_LEVEL = s;
+				SDKROOT = xros;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+				XROS_DEPLOYMENT_TARGET = 1.1;
+			};
+			name = Release;
+		};
+		C5E590432B6379EE00328ED6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = D68FA8042B73D5DD0052B7FF /* ALVRClient.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ALVRClient/ALVRClient.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 3;
+				DEVELOPMENT_ASSET_PATHS = "\"ALVRClient/Preview Content\"";
+				DEVELOPMENT_TEAM = A2R992S5N3;
+				ENABLE_PREVIEWS = YES;
+				EXCLUDED_ARCHS = x86_64;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "$(TARGET_NAME)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = ALVR;
+				INFOPLIST_KEY_GCSupportsControllerUserInteraction = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "For connecting to ALVR server on local network.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Used for in game voice chat";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)",
+				);
+				MARKETING_VERSION = 20.14.6;
+				PRODUCT_BUNDLE_IDENTIFIER = alvr.client;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "xros xrsimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "$(TARGET_NAME)/ALVRClient-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 7;
+				XROS_DEPLOYMENT_TARGET = 2.1;
+			};
+			name = Debug;
+		};
+		C5E590442B6379EE00328ED6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = D68FA8042B73D5DD0052B7FF /* ALVRClient.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ALVRClient/ALVRClient.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 3;
+				DEVELOPMENT_ASSET_PATHS = "\"ALVRClient/Preview Content\"";
+				DEVELOPMENT_TEAM = A2R992S5N3;
+				ENABLE_PREVIEWS = YES;
+				EXCLUDED_ARCHS = x86_64;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "$(TARGET_NAME)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = ALVR;
+				INFOPLIST_KEY_GCSupportsControllerUserInteraction = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "For connecting to ALVR server on local network.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Used for in game voice chat";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)",
+				);
+				MARKETING_VERSION = 20.14.6;
+				PRODUCT_BUNDLE_IDENTIFIER = alvr.client;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "xros xrsimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "$(TARGET_NAME)/ALVRClient-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 7;
+				XROS_DEPLOYMENT_TARGET = 2.1;
+			};
+			name = Release;
+		};
+		E71DEFAE2C192617008A2074 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ALVREyeBroadcast/ALVREyeBroadcast.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = A2R992S5N3;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ALVREyeBroadcast/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Send Eye Tracking To ALVR";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = alvr.client.ALVREyeBroadcast;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "xros xrsimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 7;
+				XROS_DEPLOYMENT_TARGET = 2.0;
+			};
+			name = Debug;
+		};
+		E71DEFAF2C192617008A2074 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ALVREyeBroadcast/ALVREyeBroadcast.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = A2R992S5N3;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ALVREyeBroadcast/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Send Eye Tracking To ALVR";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = alvr.client.ALVREyeBroadcast;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "xros xrsimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 7;
+				XROS_DEPLOYMENT_TARGET = 2.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		C5E590252B6379ED00328ED6 /* Build configuration list for PBXProject "ALVRClient" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C5E590402B6379EE00328ED6 /* Debug */,
+				C5E590412B6379EE00328ED6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C5E590422B6379EE00328ED6 /* Build configuration list for PBXNativeTarget "ALVRClient" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C5E590432B6379EE00328ED6 /* Debug */,
+				C5E590442B6379EE00328ED6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E71DEFAD2C192617008A2074 /* Build configuration list for PBXNativeTarget "ALVREyeBroadcast" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E71DEFAE2C192617008A2074 /* Debug */,
+				E71DEFAF2C192617008A2074 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = C5E590222B6379ED00328ED6 /* Project object */;
+}

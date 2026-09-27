@@ -1,0 +1,4 @@
+[submodule "ALVR"]
+	path = ALVR
+	url = https://github.com/TobiH-GE/alvr-client-core-pyrowave.git
+	branch = main

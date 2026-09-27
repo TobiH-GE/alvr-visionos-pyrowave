@@ -1,0 +1,3659 @@
+//
+//  WorldTracker.swift
+//
+// Basically handles everything related to ARKit and SteamVR
+//
+
+import Foundation
+import ARKit
+import CompositorServices
+import GameController
+import CoreHaptics
+import Spatial
+import RealityKit
+
+enum XrFaceExpression2FB: Int {
+    case browLowererL = 0
+    case browLowererR = 1
+    case cheekPuffL = 2
+    case cheekPuffR = 3
+    case cheekRaiserL = 4
+    case cheekRaiserR = 5
+    case cheekSuckL = 6
+    case cheekSuckR = 7
+    case chinRaiserB = 8
+    case chinRaiserT = 9
+    case dimplerL = 10
+    case dimplerR = 11
+    case eyesClosedL = 12
+    case eyesClosedR = 13
+    case eyesLookDownL = 14
+    case eyesLookDownR = 15
+    case eyesLookLeftL = 16
+    case eyesLookLeftR = 17
+    case eyesLookRightL = 18
+    case eyesLookRightR = 19
+    case eyesLookUpL = 20
+    case eyesLookUpR = 21
+    case innerBrowRaiserL = 22
+    case innerBrowRaiserR = 23
+    case jawDrop = 24
+    case jawSidewaysLeft = 25
+    case jawSidewaysRight = 26
+    case jawThrust = 27
+    case lidTightenerL = 28
+    case lidTightenerR = 29
+    case lipCornerDepressorL = 30
+    case lipCornerDepressorR = 31
+    case lipCornerPullerL = 32
+    case lipCornerPullerR = 33
+    case lipFunnelerLB = 34
+    case lipFunnelerLT = 35
+    case lipFunnelerRB = 36
+    case lipFunnelerRT = 37
+    case lipPressorL = 38
+    case lipPressorR = 39
+    case lipPuckerL = 40
+    case lipPuckerR = 41
+    case lipStretcherL = 42
+    case lipStretcherR = 43
+    case lipSuckLB = 44
+    case lipSuckLT = 45
+    case lipSuckRB = 46
+    case lipSuckRT = 47
+    case lipTightenerL = 48
+    case lipTightenerR = 49
+    case lipsToward = 50
+    case lowerLipDepressorL = 51
+    case lowerLipDepressorR = 52
+    case mouthLeft = 53
+    case mouthRight = 54
+    case noseWrinklerL = 55
+    case noseWrinklerR = 56
+    case outerBrowRaiserL = 57
+    case outerBrowRaiserR = 58
+    case upperLidRaiserL = 59
+    case upperLidRaiserR = 60
+    case upperLipRaiserL = 61
+    case upperLipRaiserR = 62
+    case tongueTipInterdental = 63
+    case tongueTipAlveolar = 64
+    case tongueFrontDorsalPalate = 65
+    case tongueMidDorsalPalate = 66
+    case tongueBackDorsalVelar = 67
+    case tongueOut = 68
+    case tongueRetreat = 69
+    case count = 70
+}
+
+extension XrFaceExpression2FB {
+    static let fromString: [String: XrFaceExpression2FB] = [
+        "browLowererL": .browLowererL,
+        "browLowererR": .browLowererR,
+        "cheekPuffL": .cheekPuffL,
+        "cheekPuffR": .cheekPuffR,
+        "cheekRaiserL": .cheekRaiserL,
+        "cheekRaiserR": .cheekRaiserR,
+        "cheekSuckL": .cheekSuckL,
+        "cheekSuckR": .cheekSuckR,
+        "chinRaiserB": .chinRaiserB,
+        "chinRaiserT": .chinRaiserT,
+        "dimplerL": .dimplerL,
+        "dimplerR": .dimplerR,
+        "eyesClosedL": .eyesClosedL,
+        "eyesClosedR": .eyesClosedR,
+        "eyesLookDownL": .eyesLookDownL,
+        "eyesLookDownR": .eyesLookDownR,
+        "eyesLookLeftL": .eyesLookLeftL,
+        "eyesLookLeftR": .eyesLookLeftR,
+        "eyesLookRightL": .eyesLookRightL,
+        "eyesLookRightR": .eyesLookRightR,
+        "eyesLookUpL": .eyesLookUpL,
+        "eyesLookUpR": .eyesLookUpR,
+        "innerBrowRaiserL": .innerBrowRaiserL,
+        "innerBrowRaiserR": .innerBrowRaiserR,
+        "jawDrop": .jawDrop,
+        "jawSidewaysLeft": .jawSidewaysLeft,
+        "jawSidewaysRight": .jawSidewaysRight,
+        "jawThrust": .jawThrust,
+        "lidTightenerL": .lidTightenerL,
+        "lidTightenerR": .lidTightenerR,
+        "lipCornerDepressorL": .lipCornerDepressorL,
+        "lipCornerDepressorR": .lipCornerDepressorR,
+        "lipCornerPullerL": .lipCornerPullerL,
+        "lipCornerPullerR": .lipCornerPullerR,
+        "lipFunnelerLB": .lipFunnelerLB,
+        "lipFunnelerLT": .lipFunnelerLT,
+        "lipFunnelerRB": .lipFunnelerRB,
+        "lipFunnelerRT": .lipFunnelerRT,
+        "lipPressorL": .lipPressorL,
+        "lipPressorR": .lipPressorR,
+        "lipPuckerL": .lipPuckerL,
+        "lipPuckerR": .lipPuckerR,
+        "lipStretcherL": .lipStretcherL,
+        "lipStretcherR": .lipStretcherR,
+        "lipSuckLB": .lipSuckLB,
+        "lipSuckLT": .lipSuckLT,
+        "lipSuckRB": .lipSuckRB,
+        "lipSuckRT": .lipSuckRT,
+        "lipTightenerL": .lipTightenerL,
+        "lipTightenerR": .lipTightenerR,
+        "lipsToward": .lipsToward,
+        "lowerLipDepressorL": .lowerLipDepressorL,
+        "lowerLipDepressorR": .lowerLipDepressorR,
+        "mouthLeft": .mouthLeft,
+        "mouthRight": .mouthRight,
+        "noseWrinklerL": .noseWrinklerL,
+        "noseWrinklerR": .noseWrinklerR,
+        "outerBrowRaiserL": .outerBrowRaiserL,
+        "outerBrowRaiserR": .outerBrowRaiserR,
+        "upperLidRaiserL": .upperLidRaiserL,
+        "upperLidRaiserR": .upperLidRaiserR,
+        "upperLipRaiserL": .upperLipRaiserL,
+        "upperLipRaiserR": .upperLipRaiserR,
+        "tongueTipInterdental": .tongueTipInterdental,
+        "tongueTipAlveolar": .tongueTipAlveolar,
+        "tongueFrontDorsalPalate": .tongueFrontDorsalPalate,
+        "tongueMidDorsalPalate": .tongueMidDorsalPalate,
+        "tongueBackDorsalVelar": .tongueBackDorsalVelar,
+        "tongueOut": .tongueOut,
+        "tongueRetreat": .tongueRetreat,
+        "count": .count
+    ]
+}
+
+enum SteamVRJoints : Int {
+    case root = 0                                  //eBone_Root
+    case wrist = 1                                 //eBone_Wrist
+    case thumbKnuckle = 2                          //eBone_Thumb0
+    case thumbIntermediateBase = 3                 //eBone_Thumb1
+    case thumbIntermediateTip = 4                  //eBone_Thumb2
+    case thumbTip = 5                              //eBone_Thumb3
+    case indexFingerMetacarpal = 6                 //eBone_IndexFinger0
+    case indexFingerKnuckle = 7                    //eBone_IndexFinger1
+    case indexFingerIntermediateBase = 8           //eBone_IndexFinger2
+    case indexFingerIntermediateTip = 9            //eBone_IndexFinger3
+    case indexFingerTip = 10                       //eBone_IndexFinger4
+    case middleFingerMetacarpal = 11               //eBone_MiddleFinger0
+    case middleFingerKnuckle = 12                  //eBone_MiddleFinger1
+    case middleFingerIntermediateBase = 13         //eBone_MiddleFinger2
+    case middleFingerIntermediateTip = 14          //eBone_MiddleFinger3
+    case middleFingerTip = 15                      //eBone_MiddleFinger4
+    case ringFingerMetacarpal = 16                 //eBone_RingFinger0
+    case ringFingerKnuckle = 17                    //eBone_RingFinger1
+    case ringFingerIntermediateBase = 18           //eBone_RingFinger2
+    case ringFingerIntermediateTip = 19            //eBone_RingFinger3
+    case ringFingerTip = 20                        //eBone_RingFinger4
+    case littleFingerMetacarpal = 21               //eBone_PinkyFinger0
+    case littleFingerKnuckle = 22                  //eBone_PinkyFinger1
+    case littleFingerIntermediateBase = 23         //eBone_PinkyFinger2
+    case littleFingerIntermediateTip = 24          //eBone_PinkyFinger3
+    case littleFingerTip = 25                      //eBone_PinkyFinger4
+
+    // SteamVR's 26-30 are aux bones and are done by ALVR
+        
+    // Special case: we want to stash these
+    case forearmWrist = 26
+    case forearmArm = 27
+    
+    case numberOfJoints = 28
+}
+
+let defaultSkeletonDisableHysteresis = 5.0
+
+func jointIdxIsMoreMobile(_ idx: Int) -> Bool {
+    if idx >= SteamVRJoints.numberOfJoints.rawValue {
+        return false
+    }
+    let joint = SteamVRJoints.init(rawValue: idx)
+    switch joint {
+    case .thumbKnuckle, .thumbIntermediateBase, .thumbIntermediateTip:
+        return true
+    case .indexFingerKnuckle, .indexFingerIntermediateBase, .indexFingerIntermediateTip, .indexFingerTip:
+        return true
+    case .middleFingerIntermediateBase, .middleFingerIntermediateTip, .middleFingerTip:
+        return true
+    case .ringFingerIntermediateBase, .ringFingerIntermediateTip, .ringFingerTip:
+        return true
+    case .littleFingerKnuckle, .littleFingerIntermediateBase, .littleFingerIntermediateTip, .littleFingerTip:
+        return true
+    default:
+        return false
+    }
+}
+
+#if XCODE_BETA_26
+//@available(visionOS 26.0, *)
+#endif
+class WorldTracker {
+    static let shared = WorldTracker()
+    
+
+    struct CachedPlaneData {
+        let id: UUID
+        let classification: PlaneAnchor.Classification
+        let transform: simd_float4x4
+        let position: SIMD3<Float>
+        let normal: SIMD3<Float>
+        let right: SIMD3<Float>
+        let forward: SIMD3<Float>
+        let halfWidth: Float
+        let halfHeight: Float
+        let boundingRadius: Float
+    }
+
+    let arSession: ARKitSession!
+    var worldTracking: WorldTrackingProvider!
+    var handTracking: HandTrackingProvider!
+    var sceneReconstruction: SceneReconstructionProvider!
+    var planeDetection: PlaneDetectionProvider!
+#if XCODE_BETA_26
+    //var accessoryTracking: AccessoryTrackingProvider?
+    var accessoryTracking: (any DataProvider)?
+#endif
+    
+    // Playspace and boundaries state
+    var planeAnchors: [UUID: PlaneAnchor] = [:]
+    var planeCache: [UUID: CachedPlaneData] = [:]
+    var worldAnchors: [UUID: WorldAnchor] = [:]
+    var worldAnchorsToRemove: [WorldAnchor] = []
+    var worldTrackingAddedOriginAnchor = false
+    var worldTrackingSteamVRTransform: simd_float4x4 = matrix_identity_float4x4
+    var worldOriginAnchor: WorldAnchor? = nil
+    var planeLock = NSObject()
+    var lastUpdatedTs: TimeInterval = 0
+    var crownPressCount = 0
+    var sentPoses = 0
+    var debuggableMats: [simd_float4x4] = []
+    var debuggableScales: [Float] = []
+    /// Solid geometry to draw as wireframe, alongside the basis gadgets.
+    /// A pose gadget shows where we think something is; a body shows whether
+    /// that pose is actually *on* the object, which is the question the Steam
+    /// Controller fusion has to answer and cannot answer from three axes.
+    var debuggableMeshes: [(simd_float4x4, simd_float4)] = []
+    var debuggablesLock = NSObject()
+    var currentAppleOriginFromAnchor: simd_float4x4 = simd_float4x4()
+    
+    // Hand tracking
+    var lastHandsUpdatedTs: TimeInterval = 0
+    var lastSentHandsTs: TimeInterval = 0
+    var lastLeftHandPose: AlvrPose = AlvrPose()
+    var lastLeftHandVel: (Float, Float, Float) = (0,0,0)
+    var lastLeftHandAngVel: (Float, Float, Float) = (0,0,0)
+    var lastRightHandPose: AlvrPose = AlvrPose()
+    var lastRightHandVel: (Float, Float, Float) = (0,0,0)
+    var lastRightHandAngVel: (Float, Float, Float) = (0,0,0)
+    
+    // Controller haptics
+    var leftHapticsStart: TimeInterval = 0
+    var leftHapticsEnd: TimeInterval = 0
+    var leftHapticsFreq: Float = 0.0
+    var leftHapticsAmplitude: Float = 0.0
+    var leftEngine: CHHapticEngine? = nil
+    
+    var rightHapticsStart: TimeInterval = 0
+    var rightHapticsEnd: TimeInterval = 0
+    var rightHapticsFreq: Float = 0.0
+    var rightHapticsAmplitude: Float = 0.0
+    var rightEngine: CHHapticEngine? = nil
+    
+    // Controller click-together to toggle hand tracking
+    var firstControllerClickTime = 0.0
+    var secondControllerClickTime = 0.0
+    var controllersAreDisabledByClickTogether = false
+    
+    // PS VR2 controller interaction profile from Sony PS VR2 steam app
+    static let psvrInteractionProfile = alvr_path_string_to_id("/interaction_profiles/sony/playstation_vr2_sense_controller")
+
+    // Face tracking
+    var fbFaceTracking = Array(repeating: Float(0.0), count: 70)
+    var fbFaceTrackingValid = false
+    
+    static let maxPrediction = 30 * NSEC_PER_MSEC
+    static let maxPredictionRK = 70 * NSEC_PER_MSEC
+    static let deviceIdHead = alvr_path_string_to_id("/user/head")
+    static let deviceIdLeftHand = alvr_path_string_to_id("/user/hand/left")
+    static let deviceIdRightHand = alvr_path_string_to_id("/user/hand/right")
+    static let deviceIdLeftForearm = alvr_path_string_to_id("/user/body/left_knee") // TODO: add a real forearm point?
+    static let deviceIdRightForearm = alvr_path_string_to_id("/user/body/right_knee") // TODO: add a real forearm point?
+    static let deviceIdLeftElbow = alvr_path_string_to_id("/user/body/left_elbow")
+    static let deviceIdRightElbow = alvr_path_string_to_id("/user/body/right_elbow")
+    static let deviceIdLeftFoot = alvr_path_string_to_id("/user/body/left_foot")
+    static let deviceIdRightFoot = alvr_path_string_to_id("/user/body/right_foot")
+    
+    // Left hand inputs
+    static let leftButtonA = alvr_path_string_to_id("/user/hand/left/input/a/click")
+    static let leftButtonB = alvr_path_string_to_id("/user/hand/left/input/b/click")
+    static let leftButtonX = alvr_path_string_to_id("/user/hand/left/input/x/click")
+    static let leftButtonY = alvr_path_string_to_id("/user/hand/left/input/y/click")
+    static let leftTriggerClick = alvr_path_string_to_id("/user/hand/left/input/trigger/click")
+    static let leftTriggerValue = alvr_path_string_to_id("/user/hand/left/input/trigger/value")
+    static let leftTriggerSensorValue = alvr_path_string_to_id("/user/hand/left/input/trigger/sensor/value")
+
+    static let leftThumbstickX = alvr_path_string_to_id("/user/hand/left/input/thumbstick/x")
+    static let leftThumbstickY = alvr_path_string_to_id("/user/hand/left/input/thumbstick/y")
+    static let leftThumbstickClick = alvr_path_string_to_id("/user/hand/left/input/thumbstick/click")
+    static let leftSystemClick = alvr_path_string_to_id("/user/hand/left/input/system/click")
+    static let leftMenuClick = alvr_path_string_to_id("/user/hand/left/input/menu/click")
+    static let leftSqueezeClick = alvr_path_string_to_id("/user/hand/left/input/squeeze/click")
+    static let leftSqueezeValue = alvr_path_string_to_id("/user/hand/left/input/squeeze/value")
+    static let leftSqueezeForce = alvr_path_string_to_id("/user/hand/left/input/squeeze/force")
+    static let leftSqueezeSensorValue = alvr_path_string_to_id("/user/hand/left/input/squeeze/sensor/value")
+
+    static let leftButtonATouched = alvr_path_string_to_id("/user/hand/left/input/a/touch")
+    static let leftButtonBTouched = alvr_path_string_to_id("/user/hand/left/input/b/touch")
+    static let leftButtonXTouched = alvr_path_string_to_id("/user/hand/left/input/x/touch")
+    static let leftButtonYTouched = alvr_path_string_to_id("/user/hand/left/input/y/touch")
+    static let leftTriggerTouched = alvr_path_string_to_id("/user/hand/left/input/trigger/touch")
+    static let leftSqueezeTouched = alvr_path_string_to_id("/user/hand/left/input/squeeze/touch")
+    static let leftThumbstickTouched = alvr_path_string_to_id("/user/hand/left/input/thumbstick/touch")
+    static let leftSystemTouched = alvr_path_string_to_id("/user/hand/left/input/system/touch")
+    static let leftMenuTouched = alvr_path_string_to_id("/user/hand/left/input/menu/touch")
+    
+    // Right hand inputs
+    static let rightButtonA = alvr_path_string_to_id("/user/hand/right/input/a/click")
+    static let rightButtonB = alvr_path_string_to_id("/user/hand/right/input/b/click")
+    static let rightButtonX = alvr_path_string_to_id("/user/hand/right/input/x/click")
+    static let rightButtonY = alvr_path_string_to_id("/user/hand/right/input/y/click")
+    static let rightTriggerClick = alvr_path_string_to_id("/user/hand/right/input/trigger/click")
+    static let rightTriggerValue = alvr_path_string_to_id("/user/hand/right/input/trigger/value")
+    static let rightTriggerSensorValue = alvr_path_string_to_id("/user/hand/right/input/trigger/sensor/value")
+
+    static let rightThumbstickX = alvr_path_string_to_id("/user/hand/right/input/thumbstick/x")
+    static let rightThumbstickY = alvr_path_string_to_id("/user/hand/right/input/thumbstick/y")
+    static let rightThumbstickClick = alvr_path_string_to_id("/user/hand/right/input/thumbstick/click")
+    static let rightSystemClick = alvr_path_string_to_id("/user/hand/right/input/system/click")
+    static let rightMenuClick = alvr_path_string_to_id("/user/hand/right/input/menu/click")
+    static let rightSqueezeClick = alvr_path_string_to_id("/user/hand/right/input/squeeze/click")
+    static let rightSqueezeValue = alvr_path_string_to_id("/user/hand/right/input/squeeze/value")
+    static let rightSqueezeForce = alvr_path_string_to_id("/user/hand/right/input/squeeze/force")
+    static let rightSqueezeSensorValue = alvr_path_string_to_id("/user/hand/right/input/squeeze/sensor/value")
+
+    static let rightButtonATouched = alvr_path_string_to_id("/user/hand/right/input/a/touch")
+    static let rightButtonBTouched = alvr_path_string_to_id("/user/hand/right/input/b/touch")
+    static let rightButtonXTouched = alvr_path_string_to_id("/user/hand/right/input/x/touch")
+    static let rightButtonYTouched = alvr_path_string_to_id("/user/hand/right/input/y/touch")
+    static let rightTriggerTouched = alvr_path_string_to_id("/user/hand/right/input/trigger/touch")
+    static let rightSqueezeTouched = alvr_path_string_to_id("/user/hand/right/input/squeeze/touch")
+    static let rightThumbstickTouched = alvr_path_string_to_id("/user/hand/right/input/thumbstick/touch")
+    static let rightSystemTouched = alvr_path_string_to_id("/user/hand/right/input/system/touch")
+    static let rightMenuTouched = alvr_path_string_to_id("/user/hand/right/input/menu/touch")
+    
+    static let appleHandToSteamVRIndex = [
+        //eBone_Root
+        "wrist": 1,                         //eBone_Wrist
+        "thumbKnuckle": 2,                  //eBone_Thumb0
+        "thumbIntermediateBase": 3,         //eBone_Thumb1
+        "thumbIntermediateTip": 4,          //eBone_Thumb2
+        "thumbTip": 5,                      //eBone_Thumb3
+        "indexFingerMetacarpal": 6,         //eBone_IndexFinger0
+        "indexFingerKnuckle": 7,            //eBone_IndexFinger1
+        "indexFingerIntermediateBase": 8,   //eBone_IndexFinger2
+        "indexFingerIntermediateTip": 9,    //eBone_IndexFinger3
+        "indexFingerTip": 10,               //eBone_IndexFinger4
+        "middleFingerMetacarpal": 11,       //eBone_MiddleFinger0
+        "middleFingerKnuckle": 12,                //eBone_MiddleFinger1
+        "middleFingerIntermediateBase": 13,       //eBone_MiddleFinger2
+        "middleFingerIntermediateTip": 14,        //eBone_MiddleFinger3
+        "middleFingerTip": 15,                    //eBone_MiddleFinger4
+        "ringFingerMetacarpal": 16,         //eBone_RingFinger0
+        "ringFingerKnuckle": 17,                  //eBone_RingFinger1
+        "ringFingerIntermediateBase": 18,         //eBone_RingFinger2
+        "ringFingerIntermediateTip": 19,          //eBone_RingFinger3
+        "ringFingerTip": 20,                      //eBone_RingFinger4
+        "littleFingerMetacarpal": 21,       //eBone_PinkyFinger0
+        "littleFingerKnuckle": 22,                //eBone_PinkyFinger1
+        "littleFingerIntermediateBase": 23,       //eBone_PinkyFinger2
+        "littleFingerIntermediateTip": 24,        //eBone_PinkyFinger3
+        "littleFingerTip": 25,                    //eBone_PinkyFinger4
+        
+        // SteamVR's 26-30 are aux bones and are done by ALVR
+        
+        // Special case: we want to stash these
+        "forearmWrist": 26,
+        "forearmArm": 27,
+    ]
+    static let leftHandOrientationCorrectionForSkeleton = simd_quatf(from: simd_float3(1.0, 0.0, 0.0), to: simd_float3(-1.0, 0.0, 0.0)) * simd_quatf(from: simd_float3(1.0, 0.0, 0.0), to: simd_float3(0.0, 0.0, -1.0))
+    static let rightHandOrientationCorrectionForSkeleton = simd_quatf(from: simd_float3(0.0, 0.0, 1.0), to: simd_float3(0.0, 0.0, -1.0)) * simd_quatf(from: simd_float3(1.0, 0.0, 0.0), to: simd_float3(0.0, 0.0, 1.0))
+    
+    // For v20.11 and later
+    static let leftHandOrientationCorrection = simd_quatf(from: simd_float3(1.0, 0.0, 0.0), to: simd_float3(0.0, -1.0, 0.0)) * simd_quatf(from: simd_float3(0.0, 1.0, 0.0), to: simd_float3(0.0, 0.0, 1.0))
+    static let rightHandOrientationCorrection = simd_quatf(from: simd_float3(1.0, 0.0, 0.0), to: simd_float3(0.0, 1.0, 0.0)) * simd_quatf(from: simd_float3(0.0, 1.0, 0.0), to: simd_float3(0.0, 0.0, 1.0))
+    
+    static let leftForearmOrientationCorrection = simd_quatf(from: simd_float3(1.0, 0.0, 0.0), to: simd_float3(0.0, 0.0, 1.0)) * simd_quatf(from: simd_float3(0.0, 1.0, 0.0), to: simd_float3(0.0, 0.0, 1.0))
+    static let rightForearmOrientationCorrection = simd_quatf(from: simd_float3(1.0, 0.0, 0.0), to: simd_float3(0.0, 0.0, 1.0)) * simd_quatf(from: simd_float3(0.0, 1.0, 0.0), to: simd_float3(0.0, 0.0, 1.0)) * simd_quatf(from: simd_float3(0.0, 1.0, 0.0), to: simd_float3(1.0, 0.0, 0.0)) * simd_quatf(from: simd_float3(0.0, 1.0, 0.0), to: simd_float3(1.0, 0.0, 0.0))
+    var testPosition = simd_float3(0.0, 0.0, 0.0)
+    
+    // Gaze rays -> controller emulation state
+    var leftSelectionRayId = -1
+    var leftSelectionRayOrigin = simd_float3(0.0, 0.0, 0.0)
+    var leftSelectionRayDirection = simd_float3(0.0, 0.0, 0.0)
+    var leftPinchStartPosition = simd_float3(0.0, 0.0, 0.0)
+    var leftPinchCurrentPosition = simd_float3(0.0, 0.0, 0.0)
+    var leftPinchStartAngle = simd_quatf()
+    var leftPinchCurrentAngle = simd_quatf()
+    var leftIsPinching = false
+    var lastLeftIsPinching = false
+    var leftPinchTrigger: Float = 0.0
+    var bothPinchSystemButtonTime: Float = 0.0
+    
+    var rightSelectionRayId = -1
+    var rightSelectionRayOrigin = simd_float3(0.0, 0.0, 0.0)
+    var rightSelectionRayDirection = simd_float3(0.0, 0.0, 0.0)
+    var rightPinchStartPosition = simd_float3(0.0, 0.0, 0.0)
+    var rightPinchCurrentPosition = simd_float3(0.0, 0.0, 0.0)
+    var rightPinchStartAngle = simd_quatf()
+    var rightPinchCurrentAngle = simd_quatf()
+    var rightIsPinching = false
+    var lastRightIsPinching = false
+    var rightPinchTrigger: Float = 0.0
+    
+    var lastPinchSentTime = 0.0
+    var leftPinchEyeDelta = simd_float3()
+    var rightPinchEyeDelta = simd_float3()
+    var floorCorrectionTransform = simd_float3()
+    
+    var leftSkeletonDisableHysteresis = 0.0
+    var rightSkeletonDisableHysteresis = 0.0
+    
+    var pinchesAreFromRealityKit = false
+    var eyeX: Float = 0.0
+    var eyeY: Float = 0.0
+    var eyeIsMipmapMethod: Bool = true
+    var eyeTrackingActive: Bool = false
+    
+    var lastSkeletonLeft:[AlvrPose]? = nil
+    var lastSkeletonRight:[AlvrPose]? = nil
+    var lastHeadPose: AlvrPose? = nil
+    var lastHeadTimestamp: Double = 0.0
+    
+    var leftControllerAnchor: Any? = nil
+    var leftControllerPose: simd_float4x4? = nil
+    var leftControllerLastLinVel: simd_float3 = simd_float3()
+    var leftControllerLinVel: simd_float3 = simd_float3()
+    var leftControllerAngVel: simd_float3 = simd_float3()
+    var leftControllerTimestamp: TimeInterval = TimeInterval()
+    var leftControllerBatteryPercent: Float = 100.0
+    var leftControllerBatteryIsCharging: Bool = true
+    
+    var rightControllerAnchor: Any? = nil
+    var rightControllerPose: simd_float4x4? = nil
+    var rightControllerLastLinVel: simd_float3 = simd_float3()
+    var rightControllerLinVel: simd_float3 = simd_float3()
+    var rightControllerAngVel: simd_float3 = simd_float3()
+    var rightControllerTimestamp: TimeInterval = TimeInterval()
+    var rightControllerBatteryPercent: Float = 100.0
+    var rightControllerBatteryIsCharging: Bool = true
+    
+    var controllerLock = NSObject()
+    
+    var arkitLock = NSObject()
+    var trackedAccessories: [GCController] = []
+    var trackedStylii: [Any] = []
+    var arRunning = false
+    var needsRecenterTrigger = false
+    var leftEyeFilter = OneEuroFilter3(minCutoff: 1.0, beta: 0.007, derivCutoff: 1.0)
+    var rightEyeFilter = OneEuroFilter3(minCutoff: 1.0, beta: 0.007, derivCutoff: 1.0)
+    var currentVergenceDepth: Float = 100.0
+    
+    init(arSession: ARKitSession = ARKitSession(), worldTracking: WorldTrackingProvider = WorldTrackingProvider(), handTracking: HandTrackingProvider = HandTrackingProvider(), sceneReconstruction: SceneReconstructionProvider = SceneReconstructionProvider(), planeDetection: PlaneDetectionProvider = PlaneDetectionProvider(alignments: [.horizontal, .vertical])) {
+        self.arSession = arSession
+        self.worldTracking = worldTracking
+        self.handTracking = handTracking
+        self.sceneReconstruction = sceneReconstruction
+        self.planeDetection = planeDetection
+        self.accessoryTracking = nil
+        
+        Task {
+            await monitorARKitSessionEvents()
+        }
+    }
+    
+    func resetPlayspace() {
+        print("Reset playspace")
+        // Reset playspace state
+        self.worldTrackingAddedOriginAnchor = false
+        self.worldTrackingSteamVRTransform = matrix_identity_float4x4
+        self.worldOriginAnchor = nil//WorldAnchor(originFromAnchorTransform: matrix_identity_float4x4)
+        self.lastUpdatedTs = 0
+        self.crownPressCount = 0
+        self.sentPoses = 0
+        self.controllersAreDisabledByClickTogether = false
+    }
+    
+    func initializeAr() async  {
+        print("initializeAr")
+        resetPlayspace()
+        
+        objc_sync_enter(arkitLock)
+        if self.arRunning {
+            self.arSession.stop()
+            self.arRunning = false
+        }
+        objc_sync_exit(arkitLock)
+        
+        worldTracking = WorldTrackingProvider()
+        handTracking = HandTrackingProvider()
+        sceneReconstruction = SceneReconstructionProvider()
+        planeDetection =  PlaneDetectionProvider(alignments: [.horizontal, .vertical])
+
+        // The Steam Controller is not a GCController and never appears in
+        // ARKit, so nothing else in the tracking bring-up would ever open it.
+        // Owner-scoped so closing the debug window mid-session doesn't hand the
+        // controller back while streaming is still using it.
+        SteamControllerManager.shared.start(.streaming)
+
+        var authStatus: [ARKitSession.AuthorizationType : ARKitSession.AuthorizationStatus] = [:]
+#if XCODE_BETA_26
+        if #available(visionOS 26.0, *) {
+            authStatus = await arSession.requestAuthorization(for: [.handTracking, .worldSensing, .accessoryTracking])
+        }
+        else {
+            authStatus = await arSession.requestAuthorization(for: [.handTracking, .worldSensing])
+        }
+#else
+        authStatus = await arSession.requestAuthorization(for: [.handTracking, .worldSensing])
+#endif
+
+        // TODO: disconnects?
+        if #available(visionOS 26.0, *) {
+#if XCODE_BETA_26
+            if AccessoryTrackingProvider.isSupported {
+                print("AAAAAA accessories supported")
+                
+                //print(GCController.controllers())
+                
+                var accessories: [Accessory] = []
+                var detectedPsvr = false
+                for spatialController in GCController.spatialControllers() {
+                    do {
+                        let accessory = try await Accessory(device: spatialController)
+                        if accessory.name.contains("PlayStation VR") {
+                            detectedPsvr = true
+                        }
+                        accessories.append(accessory)
+                    } catch {
+                        print("Error during accessory initialization: \(error)")
+                    }
+                }
+                if let alvrSettings = Settings.getAlvrSettings() {
+                    let emulationMode = alvrSettings.headset.controllers?.emulation_mode ?? ""
+                    if emulationMode == "PSVR2Sense" && detectedPsvr {
+                            alvr_send_active_interaction_profile(WorldTracker.deviceIdLeftHand, WorldTracker.psvrInteractionProfile)
+                            alvr_send_active_interaction_profile(WorldTracker.deviceIdRightHand, WorldTracker.psvrInteractionProfile)
+                    }
+                }
+                for stylus in GCStylus.styli {
+                    do {
+                        let accessory = try await Accessory(device: stylus)
+                        accessories.append(accessory)
+                    } catch {
+                        print("Error during accessory initialization: \(error)")
+                    }
+                }
+                print("AAAAAA", accessories)
+            
+                self.accessoryTracking = AccessoryTrackingProvider(accessories: accessories)
+            }
+            else {
+                print("AAAAAA accessories not supported")
+            }
+#endif
+        }
+        
+        // TODO: check for authorization changes
+        
+        var trackingList: [any DataProvider] = [worldTracking]
+        if authStatus[.handTracking] == .allowed {
+            trackingList.append(handTracking)
+        }
+        if authStatus[.worldSensing] == .allowed {
+            //trackingList.append(sceneReconstruction)
+            trackingList.append(planeDetection)
+        }
+#if XCODE_BETA_26
+        if #available(visionOS 26.0, *) {
+            if accessoryTracking == nil {
+                print("Lost the race, accessoryTracking is nil!")
+            }
+            if authStatus[.accessoryTracking] != .allowed {
+                print("Accessory tracking is disallowed.")
+            }
+            if authStatus[.accessoryTracking] == .allowed && accessoryTracking != nil {
+                trackingList.append(accessoryTracking!)
+            }
+        }
+#endif
+        
+        objc_sync_enter(arkitLock)
+        do {
+            try await arSession.run(trackingList)
+            self.arRunning = true
+        } catch {
+            fatalError("Failed to initialize ARSession")
+        }
+        objc_sync_exit(arkitLock)
+        
+        Task {
+            await processReconstructionUpdates()
+        }
+        Task {
+            await processPlaneUpdates()
+        }
+        Task {
+            await processWorldTrackingUpdates()
+        }
+        Task {
+            await processHandTrackingUpdates()
+        }
+        Task {
+            await processAccessoryTrackingUpdates()
+        }
+    }
+    
+    func processReconstructionUpdates() async {
+        for await _ in sceneReconstruction.anchorUpdates {
+            //let meshAnchor = update.anchor
+            //print(meshAnchor.id, meshAnchor.originFromAnchorTransform)
+        }
+    }
+    
+    func processPlaneUpdates() async {
+        for await update in planeDetection.anchorUpdates {
+            //print(update.event, update.anchor.classification, update.anchor.id, update.anchor.description)
+            if update.anchor.classification == .window {
+                // Skip planes that are windows.
+                continue
+            }
+            switch update.event {
+            case .added, .updated:
+                updatePlane(update.anchor)
+            case .removed:
+                removePlane(update.anchor)
+            }
+        }
+    }
+    
+    func anchorDistanceFromOrigin(anchor: WorldAnchor) -> Float {
+        let pos = anchor.originFromAnchorTransform.columns.3
+        return simd_distance(matrix_identity_float4x4.columns.3, pos)
+    }
+    
+    func anchorDistanceFromAnchor(anchorA: WorldAnchor, anchorB: WorldAnchor) -> Float {
+        let posA = anchorA.originFromAnchorTransform.columns.3
+        let posB = anchorB.originFromAnchorTransform.columns.3
+        return simd_distance(posA, posB)
+    }
+    
+    // We have an origin anchor which we use to maintain SteamVR's positions
+    // every time visionOS's centering changes.
+    func processWorldTrackingUpdates() async {
+        for await update in worldTracking.anchorUpdates {
+            let keepSteamVRCenter = await ALVRClientApp.gStore.settings.keepSteamVRCenter
+            print(update.event, update.anchor.id, update.anchor.description, update.timestamp)
+            
+            switch update.event {
+            case .added, .updated:
+                worldAnchors[update.anchor.id] = update.anchor
+                if !self.worldTrackingAddedOriginAnchor && keepSteamVRCenter && (worldOriginAnchor == nil || update.anchor.id != worldOriginAnchor!.id) {
+                    print("Early origin anchor?", anchorDistanceFromOrigin(anchor: update.anchor), "Current Origin,", self.worldOriginAnchor?.id)
+                    
+                    // If we randomly get an anchor added within 3.5m, consider that our origin
+                    if anchorDistanceFromOrigin(anchor: update.anchor) < 3.5 && update.anchor.isTracked && (worldOriginAnchor == nil || anchorDistanceFromOrigin(anchor: update.anchor) <= anchorDistanceFromOrigin(anchor: worldOriginAnchor!)) {
+                        print("Set new origin!")
+                        
+                        // This has a (positive) minor side-effect: all redundant anchors within 3.5m will get cleaned up,
+                        // though which anchor gets chosen will be arbitrary.
+                        // But there should only be one anyway.
+                        if let anchor = self.worldOriginAnchor {
+                            worldAnchorsToRemove.append(anchor)
+                        }
+                        
+                        // HACK: try and restore updates?
+                        self.worldOriginAnchor = update.anchor
+                    }
+                }
+                else {
+                    if worldOriginAnchor != nil && update.anchor.id != worldOriginAnchor!.id {
+                        if anchorDistanceFromAnchor(anchorA: update.anchor, anchorB: worldOriginAnchor!) <= 3.5 && update.anchor.isTracked {
+                            print("Removed anchor for being too close:", update.anchor.id)
+                            worldAnchorsToRemove.append( update.anchor)
+                        }
+                    }
+                }
+                
+                if worldOriginAnchor != nil && update.anchor.id == worldOriginAnchor!.id {
+                    self.worldOriginAnchor = update.anchor
+                    
+                    // This seems to happen when headset is removed, or on app close.
+                    if !update.anchor.isTracked {
+                        print("Headset removed?")
+                        //EventHandler.shared.handleHeadsetRemoved()
+                        //resetPlayspace()
+                        continue
+                    }
+
+                    print("recentering against", update.anchor.id, "... count", crownPressCount)
+                    let anchorTransform = update.anchor.originFromAnchorTransform
+                    if keepSteamVRCenter {
+                        self.worldTrackingSteamVRTransform = anchorTransform
+                    }
+                    else {
+                        print("not recentering due to settings.")
+                    }
+                    
+                    // Crown-press shenanigans
+                    if update.event == .updated {
+                        let sinceLast = CACurrentMediaTime() - lastUpdatedTs
+                        if sinceLast < 1.5 && sinceLast > 0.5 {
+                            crownPressCount += 1
+                        }
+                        else if sinceLast > 1.5 {
+                            crownPressCount = 0
+                        }
+                        lastUpdatedTs = CACurrentMediaTime()
+                        
+                        // Triple-press crown to purge nearby anchors and recenter
+                        if crownPressCount >= 2 && keepSteamVRCenter {
+                            print("Reset world origin!")
+                            
+                            // Purge all existing world anchors within 3.5m
+                            for anchorPurge in worldAnchors {
+                                if anchorDistanceFromOrigin(anchor: update.anchor) < 3.5 {
+                                    worldAnchorsToRemove.append(anchorPurge.value)
+                                }
+                            }
+                    
+                            self.worldOriginAnchor = WorldAnchor(originFromAnchorTransform: matrix_identity_float4x4)
+                            self.worldTrackingAddedOriginAnchor = true
+                            self.worldTrackingSteamVRTransform = anchorTransform
+
+                            do {
+                                try await worldTracking.addAnchor(self.worldOriginAnchor!)
+                            }
+                            catch {
+                                // don't care
+                            }
+                            
+                            crownPressCount = 0
+                            
+                            needsRecenterTrigger = true
+                        }
+                        else if !keepSteamVRCenter {
+                            print("No recentering for SteamVR")
+                            crownPressCount = 0
+                            
+                            needsRecenterTrigger = true
+                        }
+                    }
+                }
+                
+            case .removed:
+                break
+            }
+        }
+    }
+    
+    func processHandTrackingUpdates() async {
+        for await update in handTracking.anchorUpdates {
+            switch update.event {
+            case .added, .updated:
+                //print(update.timestamp - lastHandsUpdatedTs)
+                lastHandsUpdatedTs = update.timestamp
+                break
+            case .removed:
+                break
+            }
+        }
+    }
+    
+    func processAccessoryTrackingUpdates() async {
+        while self.accessoryTracking == nil {
+            try? await Task.sleep(nanoseconds: 1_000_000)
+        }
+#if XCODE_BETA_26
+        if #available(visionOS 26.0, *) {
+            if let accessories = self.accessoryTracking as! AccessoryTrackingProvider? {
+                for await update in accessories.anchorUpdates {
+                    switch update.event {
+                    case .added, .updated:
+                        if update.anchor.accessory.inherentChirality == .left {
+                            objc_sync_enter(controllerLock)
+                            leftControllerAnchor = update.anchor
+                            leftControllerPose = update.anchor.originFromAnchorTransform.asSanitized()
+                            leftControllerLinVel = update.anchor.velocity.asSanitized()
+                            leftControllerAngVel = update.anchor.angularVelocity.asSanitized()
+                            //let timestampDiff = update.anchor.timestamp - leftControllerTimestamp
+                            leftControllerTimestamp = update.anchor.timestamp
+                            //print("left diff", timestampDiff)
+                            objc_sync_exit(controllerLock)
+                        }
+                        else if update.anchor.accessory.inherentChirality == .right {
+                            objc_sync_enter(controllerLock)
+                            rightControllerAnchor = update.anchor
+                            rightControllerPose = update.anchor.originFromAnchorTransform.asSanitized()
+                            rightControllerLinVel = update.anchor.velocity.asSanitized()
+                            rightControllerAngVel = update.anchor.angularVelocity.asSanitized()
+                            //let timestampDiff = update.anchor.timestamp - rightControllerTimestamp
+                            rightControllerTimestamp = update.anchor.timestamp
+                            //print("right diff", timestampDiff)
+                            objc_sync_exit(controllerLock)
+                        }
+                        else if update.anchor.accessory.inherentChirality == .unspecified {
+                            objc_sync_enter(controllerLock)
+                            rightControllerAnchor = update.anchor
+                            rightControllerPose = update.anchor.originFromAnchorTransform.asSanitized()
+                            rightControllerLinVel = update.anchor.velocity.asSanitized()
+                            rightControllerAngVel = update.anchor.angularVelocity.asSanitized()
+                            //let timestampDiff = update.anchor.timestamp - rightControllerTimestamp
+                            rightControllerTimestamp = update.anchor.timestamp
+                            //print("right diff", timestampDiff)
+                            objc_sync_exit(controllerLock)
+                        }
+                        //print("AAAAAA", update.timestamp, update.anchor)
+                        //lastHandsUpdatedTs = update.timestamp
+                        break
+                    case .removed:
+                        if update.anchor.accessory.inherentChirality == .left {
+                            leftControllerPose = nil
+                        }
+                        else if update.anchor.accessory.inherentChirality == .right {
+                            rightControllerPose = nil
+                        }
+                        else if update.anchor.accessory.inherentChirality == .unspecified {
+                            rightControllerPose = nil
+                        }
+                        break
+                    }
+                }
+            }
+        }
+        
+#endif
+    }
+    
+    private func monitorARKitSessionEvents() async {
+        for await event in arSession.events {
+            switch event {
+            case .dataProviderStateChanged(_, let newState, let error):
+                if newState == .stopped {
+                    if let error {
+                        print("An error occurred: \(error)")
+                        //state = .arkitSessionError
+                    }
+                    //await self.initializeAr()
+                }
+            case .authorizationChanged(let type, let authorizationStatus):
+#if XCODE_BETA_26
+                if #available(visionOS 26.0, *) {
+                    if type == .accessoryTracking {
+                        if authorizationStatus == .denied {
+                            //state = .accessoryTrackingNotAuthorized
+                        } else if authorizationStatus == .allowed {
+                            //state = .startingUp
+                            // Start tracking all connected spatial controllers as soon
+                            // as the user grants accessory-tracking authorization.
+                            //trackAllConnectedSpatialControllers()
+                            await self.initializeAr()
+                        }
+                    }
+                }
+#endif
+            default:
+                break
+            }
+        }
+    }
+    
+    func updatePlane(_ anchor: PlaneAnchor) {
+        lockPlaneAnchors()
+        planeAnchors[anchor.id] = anchor
+        planeCache[anchor.id] = cachedPlaneData(from: anchor)
+        unlockPlaneAnchors()
+    }
+
+    func removePlane(_ anchor: PlaneAnchor) {
+        lockPlaneAnchors()
+        planeAnchors.removeValue(forKey: anchor.id)
+        planeCache.removeValue(forKey: anchor.id)
+        unlockPlaneAnchors()
+    }
+    
+    func lockPlaneAnchors() {
+        objc_sync_enter(planeLock)
+    }
+    
+    func unlockPlaneAnchors() {
+         objc_sync_exit(planeLock)
+    }
+
+    func snapshotPlaneData() -> [(PlaneAnchor, CachedPlaneData)] {
+        lockPlaneAnchors()
+        let snapshot = planeAnchors.compactMap { (id, anchor) -> (PlaneAnchor, CachedPlaneData)? in
+            guard let cached = planeCache[id] else { return nil }
+            return (anchor, cached)
+        }
+        unlockPlaneAnchors()
+        return snapshot
+    }
+
+    private func cachedPlaneData(from anchor: PlaneAnchor) -> CachedPlaneData {
+        let transform = anchor.originFromAnchorTransform
+        let position = SIMD3<Float>(transform.columns.3.x, transform.columns.3.y, transform.columns.3.z)
+        let normal = normalize(SIMD3<Float>(transform.columns.1.x, transform.columns.1.y, transform.columns.1.z))
+        let right = normalize(SIMD3<Float>(transform.columns.0.x, transform.columns.0.y, transform.columns.0.z))
+        let forward = normalize(SIMD3<Float>(transform.columns.2.x, transform.columns.2.y, transform.columns.2.z))
+        let extent = anchor.geometry.extent
+
+        let halfWidth = extent.width / 2.0
+        let halfHeight = extent.height / 2.0
+        let boundingRadius = sqrt((halfWidth * halfWidth) + (halfHeight * halfHeight))
+
+        return CachedPlaneData(
+            id: anchor.id,
+            classification: anchor.classification,
+            transform: transform,
+            position: position,
+            normal: normal,
+            right: right,
+            forward: forward,
+            halfWidth: halfWidth,
+            halfHeight: halfHeight,
+            boundingRadius: boundingRadius
+        )
+    }
+    
+    func lockDebuggables() {
+        objc_sync_enter(debuggablesLock)
+    }
+    
+    func unlockDebuggables() {
+         objc_sync_exit(debuggablesLock)
+    }
+    
+    func addDebuggablePose(_ mat: simd_float4x4, _ scale: Float) {
+        WorldTracker.shared.debuggableMats.append(mat)
+        WorldTracker.shared.debuggableScales.append(scale)
+    }
+
+    /// Queues the controller body wireframe at `mat`. Call between
+    /// `lockDebuggables()` and `unlockDebuggables()`, like the pose gadgets.
+    func addDebuggableMesh(_ mat: simd_float4x4, _ color: simd_float4) {
+        WorldTracker.shared.debuggableMeshes.append((mat, color))
+    }
+    
+    func enqueueHapticsPulse(isLeft: Bool, amplitude: Float, duration: TimeInterval) {
+        let now = CACurrentMediaTime()
+        if isLeft {
+            if leftHapticsEnd > now {
+                return
+            }
+            leftHapticsStart = now
+            leftHapticsEnd = now + duration
+            leftHapticsAmplitude = amplitude
+            leftHapticsFreq = 0.0
+        } else {
+            if rightHapticsEnd > now {
+                return
+            }
+            rightHapticsStart = now
+            rightHapticsEnd = now + duration
+            rightHapticsAmplitude = amplitude
+            rightHapticsFreq = 0.0
+        }
+    }
+
+    // Wrist-only pose
+    func handAnchorToPoseFallback(_ hand: HandAnchor, _ correctOrientationForSkeletonRoot: Bool) -> AlvrPose {
+        let transform = self.worldTrackingSteamVRTransform.inverse * hand.originFromAnchorTransform
+        var orientation = simd_quaternion(transform)
+        if correctOrientationForSkeletonRoot {
+            if hand.chirality == .right {
+                orientation = orientation * WorldTracker.rightHandOrientationCorrectionForSkeleton
+            }
+            else {
+                orientation = orientation * WorldTracker.leftHandOrientationCorrectionForSkeleton
+            }
+        }
+        else {
+            if hand.chirality == .right {
+                orientation = orientation * WorldTracker.rightHandOrientationCorrection
+            }
+            else {
+                orientation = orientation * WorldTracker.leftHandOrientationCorrection
+            }
+        }
+        let position = transform.columns.3.asSanitized()
+        orientation = orientation.asSanitized()
+        let pose = AlvrPose(orientation: AlvrQuat(x: orientation.vector.x, y: orientation.vector.y, z: orientation.vector.z, w: orientation.vector.w), position: (position.x, position.y, position.z))
+        return pose
+    }
+    
+    // Palm pose for controllers
+    func handAnchorToPose(_ hand: HandAnchor, _ correctOrientationForSkeletonRoot: Bool) -> AlvrPose {
+        // Fall back to wrist pose
+        guard let skeleton = hand.handSkeleton else {
+            return handAnchorToPoseFallback(hand, correctOrientationForSkeletonRoot)
+        }
+        
+        let middleMetacarpal = skeleton.joint(.middleFingerMetacarpal)
+        let middleProximal = skeleton.joint(.middleFingerKnuckle)
+        let wrist = skeleton.joint(.wrist)
+        let middleMetacarpalTransform = self.worldTrackingSteamVRTransform.inverse * hand.originFromAnchorTransform * middleMetacarpal.anchorFromJointTransform
+        let middleProximalTransform = self.worldTrackingSteamVRTransform.inverse * hand.originFromAnchorTransform * middleProximal.anchorFromJointTransform
+        let wristTransform = self.worldTrackingSteamVRTransform.inverse * hand.originFromAnchorTransform * wrist.anchorFromJointTransform
+        
+        // Use the OpenXR definition of the palm, middle point between middle metacarpal and proximal.
+        let middleMetacarpalPosition = middleMetacarpalTransform.columns.3
+        let middleProximalPosition = middleProximalTransform.columns.3
+        var position = (middleMetacarpalPosition + middleProximalPosition) / 2.0
+        
+        // Gathered manually, ensuring that the pointer was consistent for the SteamVR dashboard
+        let leftHandPositionAdj = simd_float3(0.0270715057, 0.0404448576, -0.0009587705)
+        let rightHandPositionAdj = simd_float3(-0.0270715057, -0.0404448576, 0.0009587705)
+        
+        var orientation = simd_quaternion(wristTransform)
+        if correctOrientationForSkeletonRoot {
+            if hand.chirality == .right {
+                orientation = orientation * WorldTracker.rightHandOrientationCorrectionForSkeleton
+            }
+            else {
+                orientation = orientation * WorldTracker.leftHandOrientationCorrectionForSkeleton
+            }
+        }
+        else {
+            var positionAdj = simd_float3()
+            if hand.chirality == .right {
+                positionAdj += rightHandPositionAdj
+            }
+            else {
+                positionAdj += leftHandPositionAdj
+            }
+            positionAdj = orientation.act(positionAdj)
+            position += positionAdj.asFloat4()
+            
+            var adjPost20p11 = simd_quatf(from: simd_float3(0.0, 1.0, 0.0), to: simd_normalize(simd_float3(0.0, 1.0, -0.458)))
+            if hand.chirality == .right {
+                orientation = orientation * WorldTracker.rightHandOrientationCorrectionForSkeleton
+                adjPost20p11 = WorldTracker.rightHandOrientationCorrection * adjPost20p11
+            }
+            else {
+                orientation = orientation * WorldTracker.leftHandOrientationCorrectionForSkeleton
+                adjPost20p11 = WorldTracker.leftHandOrientationCorrection * adjPost20p11
+            }
+            
+            orientation = orientation * adjPost20p11
+        }
+        
+        orientation = orientation.asSanitized()
+        position = position.asSanitized()
+        
+        position += floorCorrectionTransform.asFloat4()
+        
+        let pose = AlvrPose(orientation: AlvrQuat(x: orientation.vector.x, y: orientation.vector.y, z: orientation.vector.z, w: orientation.vector.w), position: (position.x, position.y, position.z))
+        return pose
+    }
+    
+    // Velocity-based exponential moving average filter, filters out the jitters
+    // while keeping the hands responsive.
+    func filterHandPose(_ lastPose: AlvrPose, _ pose: AlvrPose, _ strength: Float) -> AlvrPose {
+        let dp = (pose.position.0 - lastPose.position.0, pose.position.1 - lastPose.position.1, pose.position.2 - lastPose.position.2)
+        var dt = Float(lastHandsUpdatedTs - lastSentHandsTs)
+        if dt <= 0.0 {
+            dt = 0.010 // fallback 10ms
+        }
+        let linVel = simd_float3(dp.0 / dt, dp.1 / dt, dp.2 / dt)
+        
+        let movementThreshold: Float = 0.15
+        var alpha: Float = simd_distance(simd_float3(), linVel) * 0.6 * strength
+        
+        // make alphas under movementThreshold even lower and higher even higher
+        alpha = alpha / movementThreshold
+        alpha *= alpha
+        alpha *= movementThreshold
+
+        if alpha > 1.0 {
+            alpha = 1.0
+        }
+        else if alpha < 0.1 {
+            alpha = 0.01
+        }
+        let invAlpha = 1.0 - alpha
+        
+        var positionFiltered = simd_float3(pose.position.0 * alpha + lastPose.position.0 * invAlpha, pose.position.1 * alpha + lastPose.position.1 * invAlpha, pose.position.2 * alpha + lastPose.position.2 * invAlpha)
+        var orientationFiltered = simd_slerp(lastPose.orientation.asQuatf(), pose.orientation.asQuatf(), alpha)
+        
+        if positionFiltered.isUnsanitary() {
+            print("nans in hand EWMA?")
+            positionFiltered = simd_float3(pose.position.0, pose.position.1, pose.position.2)
+            orientationFiltered = pose.orientation.asQuatf()
+        }
+        
+        return AlvrPose(orientationFiltered.asSanitized(), positionFiltered.asSanitized())
+    }
+    
+    func controllerToAlvrDeviceMotion(_ isLeft: Bool, _ targetTs: Double) -> AlvrDeviceMotion? {
+        let device_id = isLeft ? WorldTracker.deviceIdLeftHand : WorldTracker.deviceIdRightHand
+        if (isLeft ? self.leftControllerPose : self.rightControllerPose) == nil || self.accessoryTracking == nil || self.controllersAreDisabledByClickTogether {
+            return nil
+        }
+        if #available(visionOS 26.0, *) {
+            objc_sync_enter(controllerLock)
+            if isLeft && self.leftControllerAnchor == nil { // crashes?
+                objc_sync_exit(controllerLock)
+                return nil
+            }
+            else if !isLeft && self.rightControllerAnchor == nil { // crashes?
+                objc_sync_exit(controllerLock)
+                return nil
+            }
+            let controllerAnchor = (isLeft ? self.leftControllerAnchor : self.rightControllerAnchor) as? AccessoryAnchor?
+            if controllerAnchor == nil {
+                objc_sync_exit(controllerLock)
+                return nil
+            }
+            let accessoryProvider = self.accessoryTracking as! AccessoryTrackingProvider
+            
+            let predictedAnchor = accessoryProvider.predictAnchor(for: controllerAnchor!!, at: targetTs)
+            if predictedAnchor == nil {
+                objc_sync_exit(controllerLock)
+                return nil
+            }
+            
+            var rotationCorrection = simd_quatf(.Rotation(eulerAngles: .init(x: Angle2D(degrees: 0.0), y: Angle2D(degrees: 0.0), z: Angle2D(degrees: 0.0), order: .xyz)))
+            var positionCorrection = simd_float3()
+            var isPsvr = predictedAnchor?.accessory.name.contains("PlayStation VR") ?? false
+            var isStylusProbably = !(predictedAnchor?.accessory.locations.contains(.grip) ?? false)
+            if isPsvr {
+                // The 5.037 originates from the SteamVR PSVR2 controller model JSON
+                rotationCorrection = simd_quatf(.Rotation(eulerAngles: .init(x: Angle2D(degrees: 5.037), y: Angle2D(degrees: 0.0), z: Angle2D(degrees: 0.0), order: .xyz)))
+            }
+            else if isStylusProbably {
+                //rotationCorrection = simd_quatf(.Rotation(eulerAngles: .init(x: Angle2D(degrees: 20.0), y: Angle2D(degrees: 0.0), z: Angle2D(degrees: 0.0), order: .xyz)))
+                
+                let pinchOffset = isLeft ? (leftPinchCurrentPosition - leftPinchStartPosition) : (rightPinchCurrentPosition - rightPinchStartPosition)
+                let adjustments = getTipAdjustments(.right) // TODO: left handedness
+                let adjUpDown = adjustments.0
+                let adjLeftRight = adjustments.1
+                let adjPosition = adjustments.2
+                
+                rotationCorrection = simd_quatf(.Rotation(eulerAngles: .init(x: Angle2D(degrees: 0.0), y: Angle2D(degrees: 0.0), z: Angle2D(degrees: 90.0), order: .xyz))) * adjLeftRight * adjUpDown
+                //let testval = sin(CACurrentMediaTime() * 0.125) * 0.005
+                //print(testval)
+                positionCorrection = pinchOffset + adjPosition + simd_float3(0.028, 0.07624374087383871 - 0.014043688994612107, 0.089) // 0.06, 0.095
+                //pinchOffset = simd_float3()
+                
+                //pinchOffset *= 3.5
+                
+                //let pose: AlvrPose = AlvrPose(q, convertApplePositionToSteamVR(appleOrigin + (appleDirection * -0.5) + pinchOffset + adjPosition))
+            }
+            
+#if DEBUG_ALVR_TRACKING
+            WorldTracker.shared.lockDebuggables()
+            let baseMat = predictedAnchor!.originFromAnchorTransform
+            let aimMat = predictedAnchor!.coordinateSpace(for: .aim, correction: .none).ancestorFromSpaceTransformFloat().matrix.asSanitized()
+            let gripMat = predictedAnchor!.coordinateSpace(for: .grip, correction: .none).ancestorFromSpaceTransformFloat().matrix.asSanitized()
+            let gripSurfaceMat = predictedAnchor!.coordinateSpace(for: .gripSurface, correction: .none).ancestorFromSpaceTransformFloat().matrix.asSanitized()
+            
+            //SIMD4<Float>(0.023110688, 0.014057219, -0.08093621, 1.0) aim to base
+            //SIMD4<Float>(0.024390697, -0.018602788, -0.008736208, 1.0) grip to base
+            //SIMD4<Float>(0.007912636, -0.018511564, -0.0137318075, 1.0) grip surface to base
+            //SIMD4<Float>(0.0012800097, -0.032660007, 0.0722, 0.0) aim to grip
+            // SteamVR aim to grip SIMD3<Float>(0.0, -0.03711825, -0.09245126)
+            // aim to grip to aim to grip (0.0012800097, 0.004458243, 0.16465126)
+            
+            let aimMatBaseRelative =  baseMat.inverse * aimMat
+            let gripMatBaseRelative =  baseMat.inverse * gripMat
+            let gripSurfaceMatBaseRelative = baseMat.inverse * gripSurfaceMat
+            //print(aimMatBaseRelative.columns.3, gripMatBaseRelative.columns.3, gripSurfaceMatBaseRelative.columns.3, gripMatBaseRelative.columns.3 - aimMatBaseRelative.columns.3)
+            WorldTracker.shared.addDebuggablePose(gripMat, 0.025)
+            WorldTracker.shared.addDebuggablePose(gripSurfaceMat, 0.025)
+            WorldTracker.shared.addDebuggablePose(aimMat, 0.025)
+            WorldTracker.shared.addDebuggablePose(baseMat, 0.05)
+            WorldTracker.shared.unlockDebuggables()
+#endif
+            
+            var controllerPose = predictedAnchor!.coordinateSpace(for: isStylusProbably ? .aim : .grip, correction: .rendered).ancestorFromSpaceTransformFloat().matrix.asSanitized()
+            let correctPsvr2Origin = simd_float3(0.002, 0.000, -0.01).asFloat4x4()
+            //let basePos = simd_float3(-0.0034, -0.0034, 0.1491).asFloat4x4()
+            //let otherBasePos = simd_float3(0.0012800097, 0.004458243, -0.16465126)
+            //let oxrAimPos = simd_float3(0.007,  -0.03894766, 0.00949694).asFloat4x4()
+            //let oxrGripPos = simd_float3(0.007, -0.00182941, 0.1019482).asFloat4x4()
+            //let handgripPos = simd_float3(0.0, 0.003, 0.097).asFloat4x4()
+            //print("base", oxrAimPos-oxrGripPos) // SIMD3<Float>(0.0, -0.03711825, -0.09245126)
+            if isPsvr {
+                controllerPose = controllerPose * correctPsvr2Origin //* handgripPos.inverse * basePos
+            }
+            
+            controllerPose = controllerPose * positionCorrection.asFloat4x4()
+            
+            // Convert from controller space to world space
+            let controllerLinVel = (controllerPose.orientationOnly() * predictedAnchor!.velocity).asSanitized()
+            let controllerAngVel = (controllerPose.orientationOnly() * predictedAnchor!.angularVelocity).asSanitized()
+            let transform = self.worldTrackingSteamVRTransform.inverse * controllerPose
+            let orientation = (simd_quaternion(transform) * rotationCorrection).asSanitized()
+            let position = transform.columns.3.asSanitized()
+            
+            // Convert from Apple space to SteamVR space
+            let linVelAdjusted = (self.worldTrackingSteamVRTransform.orientationOnly().inverse * controllerLinVel).asSanitized()
+            
+            let pose = AlvrPose(orientation: AlvrQuat(x: orientation.vector.x, y: orientation.vector.y, z: orientation.vector.z, w: orientation.vector.w), position: (position.x, position.y, position.z))
+            
+            objc_sync_exit(controllerLock)
+            return AlvrDeviceMotion(device_id: device_id, pose: pose, linear_velocity: (linVelAdjusted.x, linVelAdjusted.y, linVelAdjusted.z), angular_velocity: (controllerAngVel.x, controllerAngVel.y, controllerAngVel.z))
+        }
+        return nil
+    }
+
+    // MARK: - Steam Controller pose fusion
+
+    /// Solver state for the Steam Controller (2026).
+    ///
+    /// It gets its own path rather than joining `controllerToAlvrDeviceMotion`
+    /// because that function's first act is to look up an ARKit `AccessoryAnchor`,
+    /// and this device fundamentally does not have one — it is not a
+    /// `GCController` and not a spatial accessory. See `ALVRClient/Input/`.
+    let steamControllerFuser = ControllerPoseFuser()
+    /// Measures stick and pad positions off the thumb. Read from the debug
+    /// panel; nothing in the pose path consumes it.
+    let steamControllerProbe = ComponentProbe()
+    var lastSteamControllerPose: FusedControllerPose?
+    var steamControllerLock = NSObject()
+
+    /// How long the device stays "in hand" after capsense stops reporting one.
+    ///
+    /// Grip capsense is not perfectly steady — shifting your hold drops it for
+    /// a frame or two — and without a grace period that flickers the whole
+    /// device between controllers and hand tracking.
+    static let steamControllerReleaseGrace = 0.5
+
+    /// Whether each hand's hysteresis is currently being held up by the Steam
+    /// Controller, so releasing it can be detected as an edge.
+    var steamControllerHeldHysteresisLeft = false
+    var steamControllerHeldHysteresisRight = false
+
+    /// Whether each grip currently registers a hand.
+    var steamControllerHeldNowLeft = false
+    var steamControllerHeldNowRight = false
+    /// Host time each grip last registered a hand, or a control on that side
+    /// was used.
+    var steamControllerLastHeldTimeLeft = 0.0
+    var steamControllerLastHeldTimeRight = 0.0
+
+    /// Whether *this hand* should be driven by the Steam Controller.
+    ///
+    /// Tracked per grip rather than for the device as a whole: the two grips
+    /// are independent capsense pads, and letting go with one hand should hand
+    /// that hand back to hand tracking while the other keeps the controller.
+    /// The device has no notion of "in the user's hands" to report, so capsense
+    /// stands in for a connection state — put it down and both grips go quiet,
+    /// and we deliberately behave as though it disconnected rather than leaving
+    /// dead controllers floating wherever it was last seen.
+    func steamControllerHandIsActive(isLeft: Bool) -> Bool {
+        objc_sync_enter(steamControllerLock)
+        defer { objc_sync_exit(steamControllerLock) }
+        if isLeft ? steamControllerHeldNowLeft : steamControllerHeldNowRight { return true }
+        let last = isLeft ? steamControllerLastHeldTimeLeft : steamControllerLastHeldTimeRight
+        guard last > 0.0 else { return false }
+        return (CACurrentMediaTime() - last) < WorldTracker.steamControllerReleaseGrace
+    }
+
+    /// Whether the device is in use at all, for the input path — which is not
+    /// per hand, since one physical unit's buttons are one stream.
+    func steamControllerIsActive() -> Bool {
+        steamControllerHandIsActive(isLeft: true) || steamControllerHandIsActive(isLeft: false)
+    }
+
+    /// Thread-safe read of the last fused Steam Controller pose.
+    func currentSteamControllerPose() -> FusedControllerPose? {
+        objc_sync_enter(steamControllerLock)
+        defer { objc_sync_exit(steamControllerLock) }
+        return lastSteamControllerPose
+    }
+
+    /// Palm point and wrist orientation in **Apple world space**.
+    ///
+    /// Note the absence of `worldTrackingSteamVRTransform.inverse`, which every
+    /// neighbouring helper applies. Fusion runs entirely in Apple's frame and
+    /// converts once at the end, the same way `controllerToAlvrDeviceMotion`
+    /// does; converting on the way in would mean filtering in one frame and
+    /// comparing against IMU data expressed in another.
+    private func handObservation(_ hand: HandAnchor?) -> HandObservation? {
+        guard let hand else { return nil }
+        guard let skeleton = hand.handSkeleton else {
+            let m = hand.originFromAnchorTransform
+            return HandObservation(palmPosition: m.columns.3.asFloat3(),
+                                   palmOrientation: simd_quaternion(m),
+                                   isTracked: hand.isTracked,
+                                   thumbTip: nil,
+                                   indexTip: nil)
+        }
+        // OpenXR's palm: midway between middle metacarpal and knuckle. Same
+        // definition `handAnchorToPose` uses, so the two agree about where a
+        // hand "is" even though they end up in different spaces.
+        let metacarpal = hand.originFromAnchorTransform * skeleton.joint(.middleFingerMetacarpal).anchorFromJointTransform
+        let knuckle = hand.originFromAnchorTransform * skeleton.joint(.middleFingerKnuckle).anchorFromJointTransform
+        let wrist = hand.originFromAnchorTransform * skeleton.joint(.wrist).anchorFromJointTransform
+        let palm = (metacarpal.columns.3.asFloat3() + knuckle.columns.3.asFloat3()) * 0.5
+        let thumb = hand.originFromAnchorTransform * skeleton.joint(.thumbTip).anchorFromJointTransform
+        let index = hand.originFromAnchorTransform * skeleton.joint(.indexFingerTip).anchorFromJointTransform
+        return HandObservation(palmPosition: palm,
+                               palmOrientation: simd_quaternion(wrist),
+                               isTracked: hand.isTracked,
+                               thumbTip: thumb.columns.3.asFloat3(),
+                               indexTip: index.columns.3.asFloat3())
+    }
+
+    /// Whether any control is actually being worked.
+    ///
+    /// Excludes the grips deliberately — this answers "is a control in use",
+    /// which the caller combines with capsense to decide whether the device is
+    /// in hand at all.
+    static func steamControllerSnapshotActivity(_ snap: InputSnapshot) -> (left: Bool, right: Bool) {
+        // Controls split by which hand physically reaches them. The shared
+        // cluster in the middle — Steam, menu, view, QAM — cannot be attributed
+        // to a hand, so it counts for both.
+        let leftSide: ButtonSet = [.dpadUp, .dpadDown, .dpadLeft, .dpadRight,
+                                   .leftShoulder, .leftStickClick, .leftStickTouch,
+                                   .leftTriggerClick, .leftPadTouch, .leftPadClick,
+                                   .leftPaddle1, .leftPaddle2]
+        let rightSide: ButtonSet = [.a, .b, .x, .y,
+                                    .rightShoulder, .rightStickClick, .rightStickTouch,
+                                    .rightTriggerClick, .rightPadTouch, .rightPadClick,
+                                    .rightPaddle1, .rightPaddle2]
+        let shared: ButtonSet = [.system, .menu, .view, .quickAccess]
+
+        let a = snap.axes
+        let sharedHeld = !snap.buttons.isDisjoint(with: shared)
+        let left = sharedHeld
+            || !snap.buttons.isDisjoint(with: leftSide)
+            || abs(a.leftStick.x) > 0.15 || abs(a.leftStick.y) > 0.15
+            || a.leftTrigger > 0.15 || a.leftSqueeze > 0.15
+        let right = sharedHeld
+            || !snap.buttons.isDisjoint(with: rightSide)
+            || abs(a.rightStick.x) > 0.15 || abs(a.rightStick.y) > 0.15
+            || a.rightTrigger > 0.15 || a.rightSqueeze > 0.15
+        return (left, right)
+    }
+
+    /// The Steam Controller presented as two emulated controllers.
+    ///
+    /// **Placeholder.** ALVR's streamer implements no Steam Controller or Roy
+    /// interaction profile, so the single physical unit has to arrive as a
+    /// Touch pair. There is no meaningful separate "left controller pose" for a
+    /// two-handed device, so the two virtual controllers are planted side by
+    /// side at the two grip anchors — which is where the hands holding it
+    /// actually are, so aim rays leave roughly the right places. Once a real
+    /// profile exists this should collapse to one device with one pose.
+    func steamControllerToAlvrDeviceMotion(_ isLeft: Bool, _ targetTs: Double) -> AlvrDeviceMotion? {
+        guard !controllersAreDisabledByClickTogether,
+              steamControllerHandIsActive(isLeft: isLeft),
+              let fused = currentSteamControllerPose() else {
+            return nil
+        }
+
+        let device_id = isLeft ? WorldTracker.deviceIdLeftHand : WorldTracker.deviceIdRightHand
+
+        // Model-space grip anchor carried into Apple world space. The lever arm
+        // is also what turns the body's angular velocity into linear velocity
+        // at the grip, which is not negligible: the anchors sit ~120mm apart,
+        // so a wrist flick moves them a good deal faster than the body centre.
+        let lever = fused.orientation.act(IbexModel.gripAnchor(isLeft: isLeft))
+        let worldPosition = fused.position + lever
+        let worldLinVel = fused.linearVelocity + simd_cross(fused.angularVelocity, lever)
+        // OpenXR grip orientation for the unit, from ibex_ev1.json. Both hands
+        // get the same one; the device only has the one.
+        let worldOrientation = fused.orientation * IbexModel.rotation(degrees: IbexModel.gripRotationDegrees)
+
+        var m = simd_float4x4(worldOrientation)
+        m.columns.3 = simd_float4(worldPosition, 1)
+
+        // Apple space -> SteamVR space, the same conversion
+        // controllerToAlvrDeviceMotion applies on its way out.
+        let transform = self.worldTrackingSteamVRTransform.inverse * m
+        let orientation = simd_quaternion(transform).asSanitized()
+        let position = transform.columns.3.asSanitized()
+        let steamVrRot = self.worldTrackingSteamVRTransform.orientationOnly().inverse
+        let linVel = (steamVrRot * worldLinVel).asSanitized()
+        let angVel = (steamVrRot * fused.angularVelocity).asSanitized()
+
+        let pose = AlvrPose(
+            orientation: AlvrQuat(x: orientation.vector.x, y: orientation.vector.y, z: orientation.vector.z, w: orientation.vector.w),
+            position: (position.x, position.y, position.z))
+        return AlvrDeviceMotion(device_id: device_id,
+                                pose: pose,
+                                linear_velocity: (linVel.x, linVel.y, linVel.z),
+                                angular_velocity: (angVel.x, angVel.y, angVel.z))
+    }
+
+    /// Folds the latest controller report and hand anchors into a device pose.
+    ///
+    /// Cheap and early-outs when no Steam Controller is connected, which is the
+    /// normal case — this runs on every tracking submission.
+    func updateSteamControllerFusion(_ leftHand: HandAnchor?, _ rightHand: HandAnchor?, _ targetTs: Double) {
+        guard let device = SteamControllerManager.shared.connectedDevices.first,
+              let snapshot = device.snapshot() else {
+            objc_sync_enter(steamControllerLock)
+            lastSteamControllerPose = nil
+            steamControllerHeldNowLeft = false
+            steamControllerHeldNowRight = false
+            steamControllerLastHeldTimeLeft = 0.0
+            steamControllerLastHeldTimeRight = 0.0
+            objc_sync_exit(steamControllerLock)
+            return
+        }
+
+        // Grip capsense is the master switch, per hand — see
+        // `steamControllerHandIsActive(isLeft:)`. A control on one side being
+        // worked also counts as that hand holding on, so an unusual grip that
+        // misses the capsense pad can't drop you back into hand tracking
+        // mid-game; a controller sitting on a table does neither and goes idle.
+        let heldLeft = snapshot.buttons.contains(.leftGripTouch)
+        let heldRight = snapshot.buttons.contains(.rightGripTouch)
+        let activity = WorldTracker.steamControllerSnapshotActivity(snapshot)
+        let now = CACurrentMediaTime()
+        objc_sync_enter(steamControllerLock)
+        steamControllerHeldNowLeft = heldLeft
+        steamControllerHeldNowRight = heldRight
+        if heldLeft || activity.left { steamControllerLastHeldTimeLeft = now }
+        if heldRight || activity.right { steamControllerLastHeldTimeRight = now }
+        objc_sync_exit(steamControllerLock)
+
+        let leftObs = handObservation(leftHand)
+        let rightObs = handObservation(rightHand)
+        let fused = steamControllerFuser.update(snapshot: snapshot,
+                                                left: leftObs,
+                                                right: rightObs,
+                                                now: CACurrentMediaTime())
+
+        if let fused {
+            steamControllerProbe.observe(pose: fused, snapshot: snapshot, left: leftObs, right: rightObs)
+        }
+
+        objc_sync_enter(steamControllerLock)
+        lastSteamControllerPose = fused
+        objc_sync_exit(steamControllerLock)
+
+#if DEBUG_ALVR_TRACKING
+        guard let fused else { return }
+        // Draw the shell itself, not just a basis. Three axes at the model
+        // origin cannot show whether the solved pose is actually *on* the
+        // object — the body silhouette against your real hands can, and that is
+        // the only check available for a device with no ground truth.
+        //
+        // Green when both grips are held (yaw is measured), amber when one is
+        // (yaw is being guessed), red when neither (dead reckoning).
+        let color: simd_float4
+        if fused.heldLeft && fused.heldRight {
+            color = simd_float4(0.2, 1.0, 0.3, 1.0)
+        } else if fused.heldLeft || fused.heldRight {
+            color = simd_float4(1.0, 0.7, 0.1, 1.0)
+        } else {
+            color = simd_float4(1.0, 0.2, 0.2, 1.0)
+        }
+
+        let model = ControllerPoseFuser.modelMatrix(fused)
+        WorldTracker.shared.lockDebuggables()
+        WorldTracker.shared.addDebuggableMesh(model, color)
+
+        // Every landmark the geometry work produced, planted on the body.
+        //
+        // These are all *derived* numbers — centroids off a mesh, or in the grip
+        // sensor's case a construction built on top of three other derived
+        // points. Drawing them is the only way to tell a good extraction from a
+        // plausible-looking bad one: a marker that sits on the real stick is
+        // right, and one floating a centimetre off it is not, which is not a
+        // distinction any amount of staring at coordinates will make.
+        for landmark in IbexModel.landmarks {
+            WorldTracker.shared.addDebuggablePose(model * landmark.position.asFloat4x4(), landmark.size)
+        }
+
+        // Live pad contact, drawn while a thumb is down. This is the one
+        // landmark that moves, and it is now feeding the orientation solve, so
+        // seeing it track the real thumb is the check that `padPoint` maps the
+        // reported coordinate the right way round — a flipped axis would look
+        // perfectly stable while being wrong.
+        for isLeft in [true, false] {
+            guard let pad = isLeft ? snapshot.leftTouchpad : snapshot.rightTouchpad, pad.isTouched else { continue }
+            let point = IbexModel.padPoint(isLeft: isLeft, position: pad.position)
+            WorldTracker.shared.addDebuggablePose(model * point.asFloat4x4(), 0.025)
+        }
+
+        // The measured counterpart to the nominal anchors above: where ARKit
+        // actually put each palm while both hands were on. The gap between this
+        // and the grip sensor marker is the palm-thickness offset that
+        // `mountCorrection` currently stands in for.
+        for isLeft in [true, false] {
+            if let learned = steamControllerFuser.learnedAnchor(isLeft: isLeft) {
+                WorldTracker.shared.addDebuggablePose(model * learned.asFloat4x4(), 0.040)
+            }
+        }
+
+        WorldTracker.shared.addDebuggablePose(model * IbexModel.gripTransform, 0.05)
+        WorldTracker.shared.unlockDebuggables()
+#endif
+    }
+
+    func handAnchorToAlvrDeviceMotion(_ hand: HandAnchor, _ targetTs: Double) -> AlvrDeviceMotion {
+        let device_id = hand.chirality == .left ? WorldTracker.deviceIdLeftHand : WorldTracker.deviceIdRightHand
+        let controllerMotion = controllerToAlvrDeviceMotion(hand.chirality == .left, targetTs)
+        if controllerMotion != nil {
+            // Update hand pose for chaperone system even when using controllers
+            if hand.chirality == .left {
+                lastLeftHandPose = controllerMotion!.pose
+            } else {
+                lastRightHandPose = controllerMotion!.pose
+            }
+            return controllerMotion!
+        }
+        
+        let lastPose: AlvrPose = hand.chirality == .left ? lastLeftHandPose : lastRightHandPose
+        let pose: AlvrPose = filterHandPose(lastPose, handAnchorToPose(hand, false), 0.99)
+        let dp = (pose.position.0 - lastPose.position.0, pose.position.1 - lastPose.position.1, pose.position.2 - lastPose.position.2)
+        var dt = Float(lastHandsUpdatedTs - lastSentHandsTs)
+        if dt <= 0.0 {
+            dt = 0.010 // fallback 10ms
+        }
+        let lin_vel = (dp.0 / dt, dp.1 / dt, dp.2 / dt)
+        let ang_vel = angularVelocityBetweenQuats(lastPose.orientation, pose.orientation, dt)
+        //print(hand.chirality, dt, lin_vel, ang_vel)
+        
+        if !hand.isTracked {
+            return AlvrDeviceMotion(device_id: device_id, pose: hand.chirality == .left ? lastLeftHandPose : lastRightHandPose, linear_velocity: hand.chirality == .left ? lastLeftHandVel : lastRightHandVel, angular_velocity: hand.chirality == .left ? lastLeftHandAngVel : lastRightHandAngVel)
+        }
+        
+        if hand.chirality == .left {
+            lastLeftHandPose = pose
+            lastLeftHandVel = lin_vel
+            lastLeftHandAngVel = ang_vel
+        }
+        else {
+            lastRightHandPose = pose
+            lastRightHandVel = lin_vel
+            lastRightHandAngVel = ang_vel
+        }
+        
+        return AlvrDeviceMotion(device_id: device_id, pose: pose, linear_velocity: lin_vel, angular_velocity: ang_vel)
+    }
+    
+    func quatDifference(_ a: simd_quatf, _ b: simd_quatf) -> simd_quatf {
+        let delta = a * b.inverse
+        return simd_slerp_longest(simd_quatf(), delta, 0.001)
+    }
+    
+    func getTipAdjustments(_ chirality: HandAnchor.Chirality) -> (simd_quatf, simd_quatf, simd_float3) {
+        let isLeft = chirality == .left
+        
+        // Gathered these by oscillating the controller along the gaze ray, and then adjusting the
+        // angles slightly with pinchOffset.y until the pointer stopped moving left/right and up/down.
+        // Then I adjusted the positional offset with pinchOffset.xyz.
+        var adjUpDown = simd_quatf(from: simd_float3(0.0, 1.0, 0.0), to: simd_normalize(simd_float3(0.0, 1.0, 1.7389288)))
+        var adjLeftRight = simd_quatf(from: simd_float3(0.0, 0.0, 1.0), to: simd_normalize(simd_float3((isLeft ? 1.0 : -1.0) * 0.06772318, 0.0, 1.0)))
+        var adjPosition = simd_float3(isLeft ? -leftPinchEyeDelta.x : -rightPinchEyeDelta.x, isLeft ? -leftPinchEyeDelta.y : -rightPinchEyeDelta.y, isLeft ? -leftPinchEyeDelta.z : -rightPinchEyeDelta.z)
+        let tipOffset: Float = -0.02522 * 2 // For some reason all the controller models have this offset? TODO: XYZ per-controller?
+        
+        if let otherSettings = Settings.getAlvrSettings() {
+            let emulationMode = otherSettings.headset.controllers?.emulation_mode ?? ""
+            if emulationMode == "RiftSTouch" {
+                adjUpDown = simd_quatf(from: simd_float3(0.0, 1.0, 0.0), to: simd_normalize(simd_float3(0.0, 1.0, 1.7349951)))
+                adjLeftRight = simd_quatf(from: simd_float3(0.0, 0.0, 1.0), to: simd_normalize(simd_float3((isLeft ? 1.0 : -1.0) * 0.00451532, 0.0, 1.0)))
+            }
+            else if emulationMode == "Quest2Touch" || emulationMode == "Quest3Plus" {
+                adjUpDown = simd_quatf(from: simd_float3(0.0, 1.0, 0.0), to: simd_normalize(simd_float3(0.0, 1.0, 1.5898746)))
+                adjLeftRight = simd_quatf(from: simd_float3(0.0, 0.0, 1.0), to: simd_normalize(simd_float3((isLeft ? 1.0 : -1.0) * 0.01, 0.0, 1.0)))
+            }
+            else if emulationMode == "PSVR2Sense" {
+                adjUpDown = simd_quatf(from: simd_float3(0.0, 1.0, 0.0), to: simd_normalize(simd_float3(0.0, 1.0, 1.5898746)))
+                adjLeftRight = simd_quatf(from: simd_float3(0.0, 0.0, 1.0), to: simd_normalize(simd_float3((isLeft ? 1.0 : -1.0) * 0.01, 0.0, 1.0)))
+                
+                adjUpDown = adjUpDown * simd_quatf(real: 0.9848077, imag: simd_float3(0.17364818, 0.0, 0.0)).inverse
+            }
+            
+            // TODO: ViveWand and ViveTracker
+        }
+        
+        adjPosition.y += tipOffset
+        
+        return (adjUpDown, adjLeftRight, adjPosition)
+    }
+    
+    func pinchToAlvrDeviceMotion(_ chirality: HandAnchor.Chirality) -> AlvrDeviceMotion {
+        let isLeft = chirality == .left
+        let device_id = isLeft ? WorldTracker.deviceIdLeftHand : WorldTracker.deviceIdRightHand
+        
+        let appleOrigin = isLeft ? leftSelectionRayOrigin : rightSelectionRayOrigin
+        let appleDirection = isLeft ? leftSelectionRayDirection : rightSelectionRayDirection
+        
+        let origin = convertApplePositionToSteamVR(appleOrigin)
+        let direction = simd_normalize(convertApplePositionToSteamVR(appleOrigin + appleDirection) - origin)
+        let orient = simd_look(at: -direction)
+        
+        //let val = sin(Float(CACurrentMediaTime() * 0.25)) + 1.0
+        //let val2 = sin(Float(CACurrentMediaTime()))
+        //let val3 = (((sin(Float(CACurrentMediaTime() * 0.025)) + 1.0) * 0.5) * 0.015)
+        //let val4 = ((sin(Float(CACurrentMediaTime() * 0.125)) + 1.0) * 0.5) + 1.0
+        //let val5 = ((sin(Float(CACurrentMediaTime() * 0.125)) + 1.0) * 0.5)
+        
+        var pinchOffset = isLeft ? (leftPinchCurrentPosition - leftPinchStartPosition) : (rightPinchCurrentPosition - rightPinchStartPosition)
+        
+        //print(altitude)
+        
+        let adjustments = getTipAdjustments(chirality)
+        let adjUpDown = adjustments.0
+        let adjLeftRight = adjustments.1
+        let adjPosition = adjustments.2
+        
+        let q = simd_quatf(orient) * adjLeftRight * adjUpDown
+        //pinchOffset = simd_float3()
+        
+        pinchOffset *= 3.5
+        
+        let pose: AlvrPose = AlvrPose(q, convertApplePositionToSteamVR(appleOrigin + (appleDirection * -0.5) + pinchOffset + adjPosition))
+        
+        return AlvrDeviceMotion(device_id: device_id, pose: pose, linear_velocity: (0,0,0), angular_velocity: (0, 0, 0))
+    }
+    
+    func handAnchorToSkeleton(_ hand: HandAnchor) -> [AlvrPose]? {
+        var ret: [AlvrPose] = []
+        
+        guard let skeleton = hand.handSkeleton else {
+            return nil
+        }
+        let adjPose = floorCorrectionTransform.asFloat4x4()
+        let rootAlvrPose = handAnchorToPose(hand, true)
+        let rootOrientation = simd_quatf(ix: rootAlvrPose.orientation.x, iy: rootAlvrPose.orientation.y, iz: rootAlvrPose.orientation.z, r: rootAlvrPose.orientation.w)
+        let rootPosition = simd_float3(x: rootAlvrPose.position.0, y: rootAlvrPose.position.1, z: rootAlvrPose.position.2)
+        let rootPose = AlvrPose(orientation: AlvrQuat(x: rootOrientation.vector.x, y: rootOrientation.vector.y, z: rootOrientation.vector.z, w: rootOrientation.vector.w), position: (rootPosition.x, rootPosition.y, rootPosition.z))
+        for _ in 0...25+2 {
+            ret.append(rootPose)
+        }
+        
+        var wristOrientation = simd_quatf()
+        var wristTransform = matrix_identity_float4x4
+        
+        // Apple has two additional joints: forearmWrist and forearmArm
+        for joint in skeleton.allJoints {
+            let steamVrIdx = WorldTracker.appleHandToSteamVRIndex[joint.name.description, default:-1]
+            if steamVrIdx == -1 || steamVrIdx >= SteamVRJoints.numberOfJoints.rawValue {
+                continue
+            }
+            let transformRaw = adjPose * self.worldTrackingSteamVRTransform.inverse * hand.originFromAnchorTransform * joint.anchorFromJointTransform
+            let transform = transformRaw
+            var orientation = simd_quaternion(transform) * simd_quatf(from: simd_float3(1.0, 0.0, 0.0), to: simd_float3(0.0, 0.0, 1.0))
+            
+            if hand.chirality == .right {
+                orientation = orientation * simd_quatf(from: simd_float3(0.0, 0.0, 1.0), to: simd_float3(0.0, 0.0, -1.0))
+            }
+            else {
+                orientation = orientation * simd_quatf(from: simd_float3(1.0, 0.0, 0.0), to: simd_float3(-1.0, 0.0, 0.0))
+            }
+
+            // Make wrist/elbow trackers face outward
+            if steamVrIdx == SteamVRJoints.forearmWrist.rawValue || steamVrIdx == SteamVRJoints.forearmArm.rawValue {
+                if hand.chirality == .right {
+                    orientation = orientation * WorldTracker.rightForearmOrientationCorrection
+                }
+                else {
+                    orientation = orientation * WorldTracker.leftForearmOrientationCorrection
+                }
+            }
+            
+            if steamVrIdx == SteamVRJoints.forearmWrist.rawValue {
+                wristOrientation = orientation
+                wristTransform = transform
+            }
+            
+            // HACK: Apple's elbows currently have the same orientation as their wrists, which VRChat's IK really doesn't like.
+            if steamVrIdx == SteamVRJoints.forearmArm.rawValue {
+                orientation = simd_quatf(ix: 0.0, iy: 0.0, iz: 0.0, r: 1.0)
+            }
+            
+            // Lerp the elbows based on the wrists, with a mapping that goes from the wrist rotation 0-270deg
+            // to the elbow 0-90deg.
+            // (I'll be honest a lot of this math was trial and error, but it's very solid)
+            /*if steamVrIdx == SteamVRJoints.forearmArm.rawValue {
+                orientation = simd_quaternion(wristTransform)
+                
+                if hand.chirality == .right {
+                    //orientation = orientation * simd_quatf(from: simd_float3(0.0, 1.0, 0.0), to: simd_float3(0.0, 0.0, 1.0))
+                }
+                else {
+                    orientation = orientation * simd_quatf(from: simd_float3(0.0, 1.0, 0.0), to: simd_float3(0.0, 0.0, 1.0))
+                }
+                
+                let rot = Rotation3D(orientation)
+                let twistAxis = simd_float3(1.0, 0.0, 0.0)
+                
+                
+                let (swing, twist) = rot.swingTwist(twistAxis: RotationAxis3D.init(x: twistAxis.x, y: twistAxis.y, z: twistAxis.z))
+                
+                var swingQuat = swing.quaternion.toQuatf()
+                if hand.chirality == .right {
+                    //swingQuat = swingQuat * simd_quatf(from: simd_float3(0.0, 1.0, 0.0), to: simd_float3(0.0, 0.0, 1.0))
+                }
+                else {
+                    swingQuat = swingQuat * simd_quatf(from: simd_float3(0.0, 1.0, 0.0), to: simd_float3(0.0, 0.0, 1.0))
+                }
+                
+                let twistEuler = twist.eulerAngles(order: .xyz).angles
+                
+                
+                let val = (sin(Float(CACurrentMediaTime() * 1.5)) + 1.0) * 0.5
+                if twistEuler.x < -Double.pi/2.0 /*|| twistEuler.x > (3.0*(Double.pi/4.0))*/ {
+                    orientation = simd_slerp_longest(swingQuat, orientation, 0.333)
+                }
+                else {
+                    orientation = simd_slerp(swingQuat, orientation, 0.333)
+                }
+                
+                orientation = orientation * simd_quatf(from: simd_float3(0.0, 1.0, 0.0), to: simd_float3(0.0, 0.0, 1.0)) * simd_quatf(from: simd_float3(0.0, 1.0, 0.0), to: simd_float3(0.0, 0.0, 1.0))
+                
+                /*if hand.chirality == .left {
+                    print(hand.chirality == .right ? "right" : "left", twistEuler, val)
+                }*/
+            }*/
+
+            var position = transform.columns.3
+            // Move wrist/elbow slightly outward so that they appear to be on the surface of the arm,
+            // instead of inside it.
+            if steamVrIdx == SteamVRJoints.forearmWrist.rawValue || steamVrIdx == SteamVRJoints.forearmArm.rawValue {
+                position += transform.columns.1 * (0.025 * (hand.chirality == .right ? 1.0 : -1.0))
+            }
+            
+            let pose = AlvrPose(orientation, position)
+            
+            ret[steamVrIdx] = pose
+        }
+        
+        return ret
+    }
+    
+    func sendGamepadHaptics(isLeft: Bool, isBoth: Bool, isPsvr: Bool, haptics: GCDeviceHaptics) {
+        if (isLeft || isBoth) {
+            if leftEngine == nil {
+                leftEngine = haptics.createEngine(withLocality: GCHapticsLocality.leftHandle)
+                
+                if leftEngine == nil {
+                    for locality in haptics.supportedLocalities {
+                        if (locality.rawValue as String).contains("(L)") {
+                            leftEngine = haptics.createEngine(withLocality: locality)
+                        }
+                    }
+                }
+                
+                if leftEngine == nil {
+                    leftEngine = haptics.createEngine(withLocality: GCHapticsLocality.all)
+                }
+                
+                if leftEngine != nil {
+                    do {
+                        try leftEngine?.start()
+                    } catch {
+                        print("Error starting left engine: \(error)")
+                    }
+                }
+            }
+
+            if let engine = leftEngine {
+                //print("haptic!")
+                var duration = (leftHapticsEnd - leftHapticsStart) * (isPsvr ? 1.0 : 1.0)
+                var amplitude = leftHapticsAmplitude * (isPsvr ? 0.25 : 0.7)
+                if duration < 0 {
+                    print("Skip haptic, negative duration?", duration)
+                    amplitude = 0.0
+                    duration = 0.032
+                }
+                if leftHapticsEnd < CACurrentMediaTime() {
+                    amplitude = 0.0
+                    duration = 0.032
+                    //print("Skip haptic, already over")
+                }
+                if duration > 0.5 {
+                    duration = 0.5
+                }
+                if duration < 0.032 && !isPsvr {
+                    duration = 0.032
+                }
+                do {
+                    let hapticPattern = try CHHapticPattern(events: [
+                        CHHapticEvent(eventType: .hapticContinuous, parameters: [
+                            CHHapticEventParameter(parameterID: .hapticSharpness, value: 1.0),
+                            CHHapticEventParameter(parameterID: .hapticIntensity, value: amplitude)
+                        ], relativeTime: 0, duration: duration)
+                    ], parameters: [])
+                
+                    try engine.makePlayer(with: hapticPattern).start(atTime: engine.currentTime)
+                } catch {
+                    print("Error playing pattern: \(error)")
+                    
+                    leftEngine?.stop()
+                    leftEngine = nil
+                }
+            }
+        }
+        
+        if (!isLeft || isBoth) {
+            if rightEngine == nil {
+                rightEngine = haptics.createEngine(withLocality: GCHapticsLocality.rightHandle)
+                
+                if rightEngine == nil {
+                    for locality in haptics.supportedLocalities {
+                        if (locality.rawValue as String).contains("(r)") {
+                            rightEngine = haptics.createEngine(withLocality: locality)
+                        }
+                    }
+                }
+                
+                if rightEngine == nil {
+                    rightEngine = haptics.createEngine(withLocality: GCHapticsLocality.all)
+                }
+                
+                if rightEngine != nil {
+                    do {
+                        try rightEngine?.start()
+                    } catch {
+                        print("Error starting right engine: \(error)")
+                    }
+                }
+            }
+
+            if let engine = rightEngine {
+                //print("haptic!")
+                var duration = (rightHapticsEnd - rightHapticsStart) * (isPsvr ? 1.0 : 1.0)
+                var amplitude = rightHapticsAmplitude * (isPsvr ? 0.25 : 0.7)
+                if duration < 0 {
+                    print("Skip haptic, negative duration?", duration)
+                    amplitude = 0.0
+                    duration = 0.032
+                }
+                if rightHapticsEnd < CACurrentMediaTime() {
+                    amplitude = 0.0
+                    duration = 0.032
+                    //print("Skip haptic, already over")
+                }
+                if duration > 0.5 {
+                    duration = 0.5
+                }
+                if duration < 0.032 && !isPsvr {
+                    duration = 0.032
+                }
+                do {
+                    let hapticPattern = try CHHapticPattern(events: [
+                        CHHapticEvent(eventType: .hapticContinuous, parameters: [
+                            CHHapticEventParameter(parameterID: .hapticSharpness, value: 1.0),
+                            CHHapticEventParameter(parameterID: .hapticIntensity, value: amplitude)
+                        ], relativeTime: 0, duration: duration)
+                    ], parameters: [])
+                
+                    try engine.makePlayer(with: hapticPattern).start(atTime: engine.currentTime)
+                } catch {
+                    print("Error playing pattern: \(error)")
+                    
+                    rightEngine?.stop()
+                    rightEngine = nil
+                }
+            }
+        }
+    }
+    
+    /// The active Steam Controller binding table.
+    ///
+    /// Quest Touch emulation, because ALVR's streamer implements no Steam
+    /// Controller or Roy bindings — `steamControllerRoyEmulation()` is written
+    /// and inert, and swapping to it should be this one line once it can land.
+    static let steamControllerProfile = InteractionProfile.steamControllerQuestEmulation()
+
+    /// Rumble resend period. The controller's safety timeout is ~50ms, so a
+    /// running effect has to be re-asserted; SDL uses 40ms and so do we.
+    static let steamControllerRumbleResend = 0.040
+
+    var steamControllerLastRumbleWrite = 0.0
+    var steamControllerRumbleRunning = false
+
+    /// Drives the Steam Controller's two LRAs from ALVR's haptics events.
+    ///
+    /// `EventHandler` already parks `ALVR_EVENT_HAPTICS` in the same
+    /// `left/rightHaptics*` fields the GCController path reads, keyed on
+    /// `/user/hand/left|right` — which is exactly what the emulated controllers
+    /// announce, so nothing extra has to be plumbed to route them per hand.
+    /// The device's two LRAs are genuinely one per grip, so left/right map
+    /// straight across rather than through SDL's low/high-frequency framing.
+    ///
+    /// Writes are kept to the minimum the timeout allows. They share the BLE
+    /// link with input notifications, and resending unconditionally at 30ms was
+    /// measured to drop the input report rate from ~68Hz to ~51Hz — so this
+    /// only writes while an effect is running, then sends one zero to stop and
+    /// goes quiet.
+    ///
+    /// `*HapticsFreq` is ignored: this rumble message carries LRA speed and
+    /// gain, with no frequency term to put it in.
+    func sendSteamControllerHaptics(_ device: SteamControllerDevice) {
+        let now = CACurrentMediaTime()
+        let left = now < leftHapticsEnd ? max(0.0, min(1.0, leftHapticsAmplitude)) : 0.0
+        let right = now < rightHapticsEnd ? max(0.0, min(1.0, rightHapticsAmplitude)) : 0.0
+
+        if left > 0.0 || right > 0.0 {
+            if !steamControllerRumbleRunning || (now - steamControllerLastRumbleWrite) >= WorldTracker.steamControllerRumbleResend {
+                device.setRumble(left: left, right: right)
+                steamControllerLastRumbleWrite = now
+            }
+            steamControllerRumbleRunning = true
+        }
+        else if steamControllerRumbleRunning {
+            // One write to stop, then silence until the next effect.
+            device.setRumble(left: 0, right: 0)
+            steamControllerLastRumbleWrite = now
+            steamControllerRumbleRunning = false
+        }
+    }
+
+    /// Routes the Steam Controller through its interaction profile.
+    ///
+    /// Separate from the GCController walk below because this device is not a
+    /// GCController and never will be — it arrives over CoreBluetooth. See
+    /// `ALVRClient/Input/`.
+    func sendSteamControllerInputs() {
+        guard let device = SteamControllerManager.shared.connectedDevices.first else { return }
+
+        // Haptics run even when the device is not "held": an effect already
+        // playing when you set it down still has to be stopped.
+        sendSteamControllerHaptics(device)
+
+        // Not held? Behave as though it were unplugged, so a controller left on
+        // a desk cannot inject input while hand tracking has taken over.
+        guard steamControllerIsActive(),
+              let snapshot = device.snapshot() else {
+            return
+        }
+
+        // Emulated pinches own the triggers while they are active, the same
+        // thing the scattered `*PinchTrigger <= 0.0` guards do for the
+        // GCController paths.
+        var suppression = BindingSuppression()
+        suppression.leftTrigger = leftPinchTrigger > 0.0
+        suppression.rightTrigger = rightPinchTrigger > 0.0
+
+        InputRouter.route(snapshot: snapshot,
+                          profile: WorldTracker.steamControllerProfile,
+                          suppression: suppression,
+                          to: ALVRInputSink.shared)
+    }
+
+    func sendGamepadInputs() {
+        sendSteamControllerInputs()
+
+        func boolVal(_ val: Bool) -> AlvrButtonValue {
+            return AlvrButtonValue(tag: ALVR_BUTTON_VALUE_BINARY, AlvrButtonValue.__Unnamed_union___Anonymous_field1(AlvrButtonValue.__Unnamed_union___Anonymous_field1.__Unnamed_struct___Anonymous_field0(binary: val)))
+        }
+        
+        func scalarVal(_ val: Float) -> AlvrButtonValue {
+            return AlvrButtonValue(tag: ALVR_BUTTON_VALUE_SCALAR, AlvrButtonValue.__Unnamed_union___Anonymous_field1(AlvrButtonValue.__Unnamed_union___Anonymous_field1.__Unnamed_struct___Anonymous_field1(scalar: val)))
+        }
+        
+        // TODO: keyboards? trackpads?
+        /*
+        if let keyboard = GCKeyboard.coalesced?.keyboardInput {
+              // bind to any key-up/-down
+              keyboard.keyChangedHandler = {
+                (keyboard, key, keyCode, pressed) in
+                // compare buttons to GCKeyCode
+                print(keyboard, key, keyCode, pressed)
+              }
+            }
+         */
+    
+        if GCController.spatialControllers() != self.trackedAccessories {
+            self.trackedAccessories = GCController.spatialControllers()
+            Task {
+                //self.arSession.stop()
+                await self.initializeAr()
+            }
+        }
+        
+        var skipRightController = false
+        if #available(visionOS 26.0, *) {
+            if GCStylus.styli != self.trackedStylii as! [GCStylus] {
+                self.trackedStylii = GCStylus.styli
+                Task {
+                    //self.arSession.stop()
+                    await self.initializeAr()
+                }
+            }
+            for stylus in GCStylus.styli {
+                let isLeft = false // TODO left handedness
+                stylus.input?.inputStateQueueDepth = 1
+                guard let capturedInput = stylus.input?.nextInputState() else {
+                    continue
+                }
+                let buttons = capturedInput.buttons
+                let dpads = capturedInput.dpads
+                let axes = capturedInput.axes
+                
+                let rightAssociatedButtons = ["Tip", "Primary Button", "Secondary Button"]
+                
+                /*if let inputs = stylus.input {
+                    print("BEGIN")
+                    print("----------")
+                    for element in inputs.buttons {
+                        print("Button:", element.aliases, "element.touchedInput?.isTouched=", element.touchedInput?.isTouched, "element.forceInput?.value=",element.forceInput?.value, element.pressedInput)
+                    }
+                    for element in inputs.axes {
+                        print("Axis:", element.aliases, element, "absolute=", element.absoluteInput, "relative=", element.relativeInput)
+                    }
+                    for element in inputs.dpads {
+                        print("Dpad:", element.aliases, element)
+                    }
+                    for element in inputs.switches {
+                        print("Switch:", element.aliases, element, element.positionInput)
+                    }
+                    print("----------")
+                    print("END")
+                }*/
+                
+                alvr_send_button(WorldTracker.rightButtonA, boolVal(buttons["Primary Button"]?.pressedInput.isPressed ?? false))
+                //alvr_send_button(WorldTracker.rightButtonB, boolVal(buttons["Button B"]?.pressedInput.isPressed ?? false))
+                //alvr_send_button(WorldTracker.rightButtonX, boolVal(buttons["Button X"]?.pressedInput.isPressed ?? false))
+                //alvr_send_button(WorldTracker.rightButtonY, boolVal(buttons["Button Y"]?.pressedInput.isPressed ?? false))
+                //alvr_send_button(WorldTracker.rightThumbstickClick, boolVal(buttons["Right Thumbstick Button"]?.pressedInput.isPressed ?? false))
+                //alvr_send_button(WorldTracker.rightThumbstickX, scalarVal(axes["Right Thumbstick X Axis"]?.absoluteInput?.value ?? 0.0))
+                //alvr_send_button(WorldTracker.rightThumbstickY, scalarVal(axes["Right Thumbstick Y Axis"]?.absoluteInput?.value ?? 0.0))
+                //alvr_send_button(WorldTracker.rightSystemClick, boolVal((buttons["Button Options"]?.pressedInput.isPressed ?? false) ||
+                //                                                        (buttons["Button Share"]?.pressedInput.isPressed ?? false) ))
+                //alvr_send_button(WorldTracker.rightMenuClick, boolVal((buttons["Button Options"]?.pressedInput.isPressed ?? false) ||
+                //                                                      (buttons["Button Share"]?.pressedInput.isPressed ?? false) ))
+
+                if rightPinchTrigger <= 0.0 {
+                    alvr_send_button(WorldTracker.rightTriggerValue, scalarVal(buttons["Secondary Button"]?.pressedInput.value ?? 0.0))
+                    alvr_send_button(WorldTracker.rightTriggerClick, boolVal(buttons["Secondary Button"]?.pressedInput.isPressed ?? false))
+                    alvr_send_button(WorldTracker.rightTriggerTouched, boolVal(buttons["Secondary Button"]?.touchedInput?.isTouched ?? false))
+                }
+                
+                alvr_send_button(WorldTracker.rightSqueezeClick, boolVal(buttons["Tip"]?.pressedInput.isPressed ?? false))
+                alvr_send_button(WorldTracker.rightSqueezeValue, scalarVal(buttons["Tip"]?.pressedInput.value ?? 0.0))
+                alvr_send_button(WorldTracker.rightSqueezeForce, scalarVal((buttons["Tip"]?.forceInput?.value ?? ((buttons["Tip"]?.pressedInput.isPressed ?? false) ? 1.0 : 0.0))))
+                alvr_send_button(WorldTracker.rightSqueezeTouched, boolVal((buttons["Tip"]?.forceInput?.value ?? 0.0) > 0.0))
+                
+                for val in rightAssociatedButtons {
+                    if buttons[val]?.pressedInput.isPressed ?? false {
+                        rightSkeletonDisableHysteresis = defaultSkeletonDisableHysteresis
+                    }
+                }
+                
+                if let haptics = stylus.haptics {
+                    sendGamepadHaptics(isLeft: false, isBoth: false, isPsvr: false, haptics: haptics)
+                }
+                
+                skipRightController = true
+            }
+        }
+        
+        for controller in GCController.controllers() {
+            let isLeft = (controller.vendorName == "Joy-Con (L)") || (controller.vendorName == "PlayStation VR2 Sense Controller (L)")
+            var isBoth = (controller.vendorName == "Joy-Con (L/R)") || !(controller.vendorName?.contains("Joy-Con") ?? true)
+            var isPsvr = false
+            if controller.vendorName?.contains("PlayStation VR") ?? false {
+                isBoth = false
+                isPsvr = true
+            }
+            if (!isLeft || isBoth) && skipRightController {
+                continue
+            }
+            //print(controller.vendorName, controller.physicalInputProfile.elements, controller.physicalInputProfile.allButtons)
+
+            controller.input.inputStateQueueDepth = 1
+            guard let capturedInput = controller.input.nextInputState() else {
+                continue
+            }
+            let buttons = capturedInput.buttons
+            let dpads = capturedInput.dpads
+            let axes = capturedInput.axes
+
+            // PSVR buttons:
+            // Thumbstick Left, Thumbstick Right, Grip, Trigger, Thumbstick Button, Button B, Button A, Button Menu, Thumbstick Down, Thumbstick Up
+            // PSVR Axis:
+            // Thumbstick X Axis, Thumbstick Y Axis
+
+            var leftAssociatedButtons: [String] = []
+            var rightAssociatedButtons: [String] = []
+            var leftAssociatedAxis: [String] = []
+            var rightAssociatedAxis: [String] = []
+            var leftAssociatedDpads: [String] = []
+            var rightAssociatedDpads: [String] = []
+            
+            if isLeft {
+                WorldTracker.shared.leftControllerBatteryPercent = controller.battery?.batteryLevel ?? 100.0
+                WorldTracker.shared.leftControllerBatteryIsCharging = (controller.battery?.batteryState ?? .full) == .charging
+            }
+            else {
+                WorldTracker.shared.rightControllerBatteryPercent = controller.battery?.batteryLevel ?? 100.0
+                WorldTracker.shared.rightControllerBatteryIsCharging = (controller.battery?.batteryState ?? .full) == .charging
+            }
+            
+            // Special-case PSVR controllers because we plan to support them specifically
+            // Need to check visionOS 26 here because forceInputs e.g. for triggers, are a 26-only feature.
+            if #available(visionOS 26.0, *) {
+                /*
+                if let inputs = controller.input.unmapped {
+                    print("BEGIN")
+                    print("----------")
+                    for element in inputs.buttons {
+                        print("Button:", element.aliases, "element.touchedInput?.isTouched=", element.touchedInput?.isTouched, "element.forceInput?.value=",element.forceInput?.value, element.pressedInput)
+                    }
+                    for element in inputs.axes {
+                        print("Axis:", element.aliases, element, "absolute=", element.absoluteInput, "relative=", element.relativeInput)
+                    }
+                    for element in inputs.dpads {
+                        print("Dpad:", element.aliases, element)
+                    }
+                    for element in inputs.switches {
+                        print("Switch:", element.aliases, element, element.positionInput)
+                    }
+                    print("----------")
+                    print("END")
+                }
+                */
+                
+                if isPsvr {
+                    leftAssociatedButtons = ["Thumbstick Left", "Thumbstick Right", "Grip", "Trigger", "Thumbstick Button", "Button B", "Button A", "Button Menu", "Thumbstick Down", "Thumbstick Up"]
+                    leftAssociatedDpads = ["Thumbstick"]
+                    rightAssociatedButtons = leftAssociatedButtons
+                    rightAssociatedDpads = leftAssociatedDpads
+
+                    if isLeft {
+                        alvr_send_button(WorldTracker.leftButtonX, boolVal(buttons["Button A"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.leftButtonY, boolVal(buttons["Button B"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.leftThumbstickClick, boolVal(buttons["Thumbstick Button"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.leftThumbstickX, scalarVal(dpads["Thumbstick"]?.xAxis.value ?? 0.0))
+                        alvr_send_button(WorldTracker.leftThumbstickY, scalarVal(dpads["Thumbstick"]?.yAxis.value ?? 0.0))
+                        if leftPinchTrigger <= 0.0 {
+                            alvr_send_button(WorldTracker.leftTriggerClick, boolVal(buttons["Trigger"]?.pressedInput.isPressed ?? false))
+                            alvr_send_button(WorldTracker.leftTriggerValue, scalarVal(buttons["Trigger"]?.pressedInput.value ?? 0.0 ))
+                        }
+
+                        alvr_send_button(WorldTracker.leftSqueezeClick, boolVal(buttons["Grip"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.leftSqueezeValue, scalarVal((buttons["Grip"]?.pressedInput.isPressed ?? false) ? 1.0 : 0.0))
+                        alvr_send_button(WorldTracker.leftSqueezeTouched, boolVal(buttons["Grip"]?.touchedInput?.isTouched ?? false))
+                        // Workaround until Apple supports grip sensor
+                        alvr_send_button(WorldTracker.leftSqueezeSensorValue, scalarVal((buttons["Grip"]?.touchedInput?.isTouched ?? false) ? 1.0 : 0.0))
+
+                        alvr_send_button(WorldTracker.leftButtonXTouched, boolVal(buttons["Button A"]?.touchedInput?.isTouched ?? false))
+                        alvr_send_button(WorldTracker.leftButtonYTouched, boolVal(buttons["Button B"]?.touchedInput?.isTouched ?? false))
+                        alvr_send_button(WorldTracker.leftThumbstickTouched, boolVal(buttons["Thumbstick Button"]?.touchedInput?.isTouched ?? false))
+                        alvr_send_button(WorldTracker.leftTriggerTouched, boolVal(buttons["Trigger"]?.touchedInput?.isTouched ?? false))
+                        // Workaround until Apple supports trigger sensors
+                        alvr_send_button(WorldTracker.leftTriggerSensorValue, scalarVal((buttons["Trigger"]?.touchedInput?.isTouched ?? false) ? 1.0 : 0.0))
+
+                        alvr_send_button(WorldTracker.leftMenuTouched, boolVal(buttons["Button Menu"]?.touchedInput?.isTouched ?? false))
+                        alvr_send_button(WorldTracker.leftSystemTouched, boolVal(buttons["Button Menu"]?.touchedInput?.isTouched ?? false))
+                        alvr_send_button(WorldTracker.leftMenuClick, boolVal(buttons["Button Menu"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.leftSystemClick, boolVal(buttons["Button Menu"]?.pressedInput.isPressed ?? false))
+
+                    }
+                    else {
+                        alvr_send_button(WorldTracker.rightButtonA, boolVal(buttons["Button A"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.rightButtonB, boolVal(buttons["Button B"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.rightThumbstickClick, boolVal(buttons["Thumbstick Button"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.rightThumbstickX, scalarVal(dpads["Thumbstick"]?.xAxis.value ?? 0.0))
+                        alvr_send_button(WorldTracker.rightThumbstickY, scalarVal(dpads["Thumbstick"]?.yAxis.value ?? 0.0))
+
+                        if rightPinchTrigger <= 0.0 {
+                            alvr_send_button(WorldTracker.rightTriggerClick, boolVal(buttons["Trigger"]?.pressedInput.isPressed ?? false))
+                            alvr_send_button(WorldTracker.rightTriggerValue, scalarVal(buttons["Trigger"]?.pressedInput.value ?? 0.0))
+                        }
+
+                        alvr_send_button(WorldTracker.rightSqueezeClick, boolVal(buttons["Grip"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.rightSqueezeValue, scalarVal((buttons["Grip"]?.pressedInput.isPressed ?? false) ? 1.0 : 0.0))
+                        alvr_send_button(WorldTracker.rightSqueezeTouched, boolVal(buttons["Grip"]?.touchedInput?.isTouched ?? false))
+                        // Workaround until Apple supports grip sensor
+                        alvr_send_button(WorldTracker.rightSqueezeSensorValue, scalarVal(((buttons["Grip"]?.touchedInput?.isTouched ?? false) ? 1.0 : 0.0)))
+
+                        alvr_send_button(WorldTracker.rightButtonATouched, boolVal(buttons["Button A"]?.touchedInput?.isTouched ?? false))
+                        alvr_send_button(WorldTracker.rightButtonBTouched, boolVal(buttons["Button B"]?.touchedInput?.isTouched ?? false))
+                        alvr_send_button(WorldTracker.rightThumbstickTouched, boolVal(buttons["Thumbstick Button"]?.touchedInput?.isTouched ?? false))
+                        alvr_send_button(WorldTracker.rightTriggerTouched, boolVal(buttons["Trigger"]?.touchedInput?.isTouched ?? false))
+                        // Workaround until Apple supports trigger sensors
+                        alvr_send_button(WorldTracker.rightTriggerSensorValue, scalarVal(((buttons["Trigger"]?.touchedInput?.isTouched ?? false) ? 1.0 : 0.0)))
+
+                        alvr_send_button(WorldTracker.rightMenuTouched, boolVal(buttons["Button Menu"]?.touchedInput?.isTouched ?? false))
+                        alvr_send_button(WorldTracker.rightSystemTouched, boolVal(buttons["Button Menu"]?.touchedInput?.isTouched ?? false))
+                        alvr_send_button(WorldTracker.rightMenuClick, boolVal(buttons["Button Menu"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.rightSystemClick, boolVal(buttons["Button Menu"]?.pressedInput.isPressed ?? false))
+                    }
+                }
+            }
+            if !isPsvr {
+                if let gp = controller.extendedGamepad {
+                    isBoth = true
+
+                    leftAssociatedButtons = ["Left Thumbstick Button", "Button Share", "Button Options", "Left Trigger", "Left Shoulder"]
+                    rightAssociatedButtons = ["Button A", "Button B", "Button X", "Button Y", "Right Thumbstick Button", "Button Menu", "Button Home", "Right Trigger", "Right Shoulder"]
+                    leftAssociatedAxis = ["Left Thumbstick X Axis", "Left Thumbstick Y Axis", "Direction Pad X Axis", "Direction Pad Y Axis", "Left Trigger"]
+                    rightAssociatedAxis = ["Right Thumbstick X Axis", "Right Thumbstick Y Axis", "Right Trigger"]
+
+                    alvr_send_button(WorldTracker.rightButtonA, boolVal(gp.buttonA.isPressed))
+                    alvr_send_button(WorldTracker.rightButtonB, boolVal(gp.buttonB.isPressed))
+                    alvr_send_button(WorldTracker.rightButtonY, boolVal(gp.buttonY.isPressed))
+
+                    // Kinda weird here, we're emulating Quest controllers bc we don't have a real input profile.
+                    alvr_send_button(WorldTracker.leftButtonY, boolVal(gp.dpad.right.isPressed))
+                    alvr_send_button(WorldTracker.leftButtonX, boolVal(gp.dpad.down.isPressed || gp.dpad.left.isPressed))
+
+                    // ZL/ZR -> Trigger
+                    if self.leftPinchTrigger <= 0.0 {
+                        alvr_send_button(WorldTracker.leftTriggerClick, boolVal(gp.leftTrigger.isPressed))
+                        alvr_send_button(WorldTracker.leftTriggerValue, scalarVal(gp.leftTrigger.value))
+                    }
+                    if self.rightPinchTrigger <= 0.0 {
+                        alvr_send_button(WorldTracker.rightTriggerClick, boolVal(gp.rightTrigger.isPressed))
+                        alvr_send_button(WorldTracker.rightTriggerValue, scalarVal(gp.rightTrigger.value))
+                    }
+
+                    // L/R -> Squeeze
+                    alvr_send_button(WorldTracker.leftSqueezeClick, boolVal(gp.leftShoulder.isPressed || gp.dpad.up.isPressed))
+                    alvr_send_button(WorldTracker.leftSqueezeValue, scalarVal(max(gp.leftShoulder.value, gp.dpad.up.isPressed ? 1.0 : 0.0)))
+                    alvr_send_button(WorldTracker.leftSqueezeForce, scalarVal(max(gp.leftShoulder.value, gp.dpad.up.isPressed ? 1.0 : 0.0)))
+
+                    alvr_send_button(WorldTracker.rightSqueezeClick, boolVal(gp.rightShoulder.isPressed || gp.buttonX.isPressed))
+                    alvr_send_button(WorldTracker.rightSqueezeValue, scalarVal(max(gp.rightShoulder.value, gp.buttonX.isPressed ? 1.0 : 0.0)))
+                    alvr_send_button(WorldTracker.rightSqueezeForce, scalarVal(max(gp.rightShoulder.value, gp.buttonX.isPressed ? 1.0 : 0.0)))
+
+                    // Thumbsticks
+                    alvr_send_button(WorldTracker.leftThumbstickX, scalarVal(gp.leftThumbstick.xAxis.value))
+                    alvr_send_button(WorldTracker.leftThumbstickY, scalarVal(gp.leftThumbstick.yAxis.value))
+                    alvr_send_button(WorldTracker.rightThumbstickX, scalarVal(gp.rightThumbstick.xAxis.value))
+                    alvr_send_button(WorldTracker.rightThumbstickY, scalarVal(gp.rightThumbstick.yAxis.value))
+                    alvr_send_button(WorldTracker.leftThumbstickClick, boolVal(gp.leftThumbstickButton?.isPressed ?? false))
+                    alvr_send_button(WorldTracker.rightThumbstickClick, boolVal(gp.rightThumbstickButton?.isPressed ?? false))
+
+                    // System buttons of various varieties (whichever one actually hits)
+                    let leftSystem = (buttons["Button Home"]?.pressedInput.isPressed ?? false) || (buttons["Button Menu"]?.pressedInput.isPressed ?? false)
+                    let rightSystem = (buttons["Button Share"]?.pressedInput.isPressed ?? false) || (buttons["Button Options"]?.pressedInput.isPressed ?? false)
+                    alvr_send_button(WorldTracker.leftSystemClick, boolVal(leftSystem))
+                    alvr_send_button(WorldTracker.rightSystemClick, boolVal(rightSystem))
+                    alvr_send_button(WorldTracker.leftMenuClick, boolVal(leftSystem))
+                    alvr_send_button(WorldTracker.rightMenuClick, boolVal(rightSystem))
+                }
+                else {
+                    // At some point we might want to use this (for separate motion), but at the moment we cannot, because it is incomplete
+
+                    //print(controller.vendorName, controller.physicalInputProfile.allButtons)
+                    if isBoth {
+                        leftAssociatedButtons = ["Left Thumbstick Button", "Button Share", "Button Options", "Left Trigger", "Left Shoulder"]
+                        rightAssociatedButtons = ["Button A", "Button B", "Button X", "Button Y", "Right Thumbstick Button", "Button Menu", "Button Home", "Right Trigger", "Right Shoulder"]
+                        leftAssociatedAxis = ["Left Thumbstick X Axis", "Left Thumbstick Y Axis", "Left Trigger", "Direction Pad X Axis", "Direction Pad Y Axis"]
+                        rightAssociatedAxis = ["Right Thumbstick X Axis", "Right Thumbstick Y Axis", "Right Trigger"]
+
+                        alvr_send_button(WorldTracker.rightButtonA, boolVal(buttons["Button A"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.rightButtonB, boolVal(buttons["Button B"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.rightButtonX, boolVal(buttons["Button X"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.rightButtonY, boolVal(buttons["Button Y"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.rightThumbstickClick, boolVal(buttons["Right Thumbstick Button"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.rightThumbstickX, scalarVal(axes["Right Thumbstick X Axis"]?.absoluteInput?.value ?? 0.0))
+                        alvr_send_button(WorldTracker.rightThumbstickY, scalarVal(axes["Right Thumbstick Y Axis"]?.absoluteInput?.value ?? 0.0))
+                        
+                        alvr_send_button(WorldTracker.rightSystemClick,
+                                         boolVal((buttons["Button Menu"]?.pressedInput.isPressed ?? false) || buttons["Button Home"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.rightMenuClick,
+                                         boolVal((buttons["Button Menu"]?.pressedInput.isPressed ?? false) || buttons["Button Home"]?.pressedInput.isPressed ?? false))
+
+                        if rightPinchTrigger <= 0.0 {
+                            if #available(visionOS 26.0, *) {
+                                alvr_send_button(WorldTracker.rightTriggerValue, scalarVal(buttons["Right Trigger"]?.forceInput?.value ??  ((buttons["Right Trigger"]?.pressedInput.isPressed ?? false) ? 1.0 : 0.0)))
+                            }
+                            else {
+                                alvr_send_button(WorldTracker.rightTriggerValue, scalarVal((buttons["Right Trigger"]?.pressedInput.isPressed ?? false) ? 1.0 : 0.0))
+                            }
+                            alvr_send_button(WorldTracker.rightTriggerClick, boolVal(buttons["Right Trigger"]?.pressedInput.isPressed ?? false))
+                        }
+
+                        alvr_send_button(WorldTracker.rightSqueezeClick, boolVal(buttons["Right Shoulder"]?.pressedInput.isPressed ?? false))
+                        if #available(visionOS 26.0, *) {
+                            alvr_send_button(WorldTracker.rightSqueezeValue, scalarVal((buttons["Right Shoulder"]?.forceInput?.value ?? ((buttons["Right Shoulder"]?.pressedInput.isPressed ?? false) ? 1.0 : 0.0))))
+                            alvr_send_button(WorldTracker.rightSqueezeForce, scalarVal((buttons["Right Shoulder"]?.forceInput?.value ?? ((buttons["Right Shoulder"]?.pressedInput.isPressed ?? false) ? 1.0 : 0.0))))
+                        }
+                        else {
+                            alvr_send_button(WorldTracker.rightSqueezeValue, scalarVal((buttons["Right Shoulder"]?.pressedInput.isPressed ?? false) ? 1.0 : 0.0))
+                            alvr_send_button(WorldTracker.rightSqueezeForce, scalarVal((buttons["Right Shoulder"]?.pressedInput.isPressed ?? false) ? 1.0 : 0.0))
+                        }
+                        
+                        alvr_send_button(WorldTracker.leftButtonA, boolVal(buttons["Direction Pad Left"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.leftButtonB, boolVal(buttons["Direction Pad Down"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.leftButtonX, boolVal(buttons["Direction Pad Up"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.leftButtonY, boolVal(buttons["Direction Pad Right"]?.pressedInput.isPressed ?? false))
+
+                        alvr_send_button(WorldTracker.leftThumbstickClick, boolVal(buttons["Left Thumbstick Button"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.leftThumbstickX, scalarVal(axes["Left Thumbstick X Axis"]?.absoluteInput?.value ?? 0.0))
+                        alvr_send_button(WorldTracker.leftThumbstickY, scalarVal(axes["Left Thumbstick Y Axis"]?.absoluteInput?.value ?? 0.0))
+                        
+                        alvr_send_button(WorldTracker.leftSystemClick,
+                                         boolVal((buttons["Button Share"]?.pressedInput.isPressed ?? false) || (buttons["Button Options"]?.pressedInput.isPressed ?? false)))
+                        alvr_send_button(WorldTracker.leftMenuClick,
+                                         boolVal((buttons["Button Share"]?.pressedInput.isPressed ?? false) || (buttons["Button Options"]?.pressedInput.isPressed ?? false)))
+
+                        if leftPinchTrigger <= 0.0 {
+                            if #available(visionOS 26.0, *) {
+                                alvr_send_button(WorldTracker.leftTriggerValue, scalarVal(buttons["Left Trigger"]?.forceInput?.value ??  ((buttons["Left Trigger"]?.pressedInput.isPressed ?? false) ? 1.0 : 0.0)))
+                            }
+                            else {
+                                alvr_send_button(WorldTracker.leftTriggerValue, scalarVal((buttons["Left Trigger"]?.pressedInput.isPressed ?? false) ? 1.0 : 0.0))
+                            }
+                            alvr_send_button(WorldTracker.leftTriggerClick, boolVal(buttons["Left Trigger"]?.pressedInput.isPressed ?? false))
+                        }
+
+                        alvr_send_button(WorldTracker.leftSqueezeClick, boolVal(buttons["Left Shoulder"]?.pressedInput.isPressed ?? false))
+                        if #available(visionOS 26.0, *) {
+                            alvr_send_button(WorldTracker.leftSqueezeValue, scalarVal((buttons["Left Shoulder"]?.forceInput?.value ?? ((buttons["Left Shoulder"]?.pressedInput.isPressed ?? false) ? 1.0 : 0.0))))
+                            alvr_send_button(WorldTracker.leftSqueezeForce, scalarVal((buttons["Left Shoulder"]?.forceInput?.value ?? ((buttons["Left Shoulder"]?.pressedInput.isPressed ?? false) ? 1.0 : 0.0))))
+                        }
+                        else {
+                            alvr_send_button(WorldTracker.leftSqueezeValue, scalarVal((buttons["Left Shoulder"]?.pressedInput.isPressed ?? false) ? 1.0 : 0.0))
+                            alvr_send_button(WorldTracker.leftSqueezeForce, scalarVal((buttons["Left Shoulder"]?.pressedInput.isPressed ?? false) ? 1.0 : 0.0))
+                        }
+                    }
+                    else if !isLeft {
+                        rightAssociatedButtons = ["Button A", "Button B", "Button X", "Button Y", "Right Thumbstick Button", "Button Options", "Button Share",  "Right Trigger", "Right Shoulder"]
+                        rightAssociatedAxis = ["Right Thumbstick X Axis", "Right Thumbstick Y Axis", "Right Trigger"]
+
+                        alvr_send_button(WorldTracker.rightButtonA, boolVal(buttons["Button A"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.rightButtonB, boolVal(buttons["Button B"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.rightButtonX, boolVal(buttons["Button X"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.rightButtonY, boolVal(buttons["Button Y"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.rightThumbstickClick, boolVal(buttons["Right Thumbstick Button"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.rightThumbstickX, scalarVal(axes["Right Thumbstick X Axis"]?.absoluteInput?.value ?? 0.0))
+                        alvr_send_button(WorldTracker.rightThumbstickY, scalarVal(axes["Right Thumbstick Y Axis"]?.absoluteInput?.value ?? 0.0))
+                        alvr_send_button(WorldTracker.rightSystemClick, boolVal((buttons["Button Options"]?.pressedInput.isPressed ?? false) ||
+                                                                                (buttons["Button Share"]?.pressedInput.isPressed ?? false) ))
+                        alvr_send_button(WorldTracker.rightMenuClick, boolVal((buttons["Button Options"]?.pressedInput.isPressed ?? false) ||
+                                                                              (buttons["Button Share"]?.pressedInput.isPressed ?? false) ))
+
+                        if rightPinchTrigger <= 0.0 {
+                            if #available(visionOS 26.0, *) {
+                                alvr_send_button(WorldTracker.rightTriggerValue, scalarVal(buttons["Right Trigger"]?.forceInput?.value ??  ((buttons["Right Trigger"]?.pressedInput.isPressed ?? false) ? 1.0 : 0.0)))
+                            }
+                            else {
+                                alvr_send_button(WorldTracker.rightTriggerValue, scalarVal((buttons["Right Trigger"]?.pressedInput.isPressed ?? false) ? 1.0 : 0.0))
+                            }
+                            alvr_send_button(WorldTracker.rightTriggerClick, boolVal(buttons["Right Trigger"]?.pressedInput.isPressed ?? false))
+                        }
+                        
+                        alvr_send_button(WorldTracker.rightSqueezeClick, boolVal(buttons["Right Shoulder"]?.pressedInput.isPressed ?? false))
+                        if #available(visionOS 26.0, *) {
+                            alvr_send_button(WorldTracker.rightSqueezeValue, scalarVal((buttons["Right Shoulder"]?.forceInput?.value ?? ((buttons["Right Shoulder"]?.pressedInput.isPressed ?? false) ? 1.0 : 0.0))))
+                            alvr_send_button(WorldTracker.rightSqueezeForce, scalarVal((buttons["Right Shoulder"]?.forceInput?.value ?? ((buttons["Right Shoulder"]?.pressedInput.isPressed ?? false) ? 1.0 : 0.0))))
+                        }
+                        else {
+                            alvr_send_button(WorldTracker.rightSqueezeValue, scalarVal((buttons["Right Shoulder"]?.pressedInput.isPressed ?? false) ? 1.0 : 0.0))
+                            alvr_send_button(WorldTracker.rightSqueezeForce, scalarVal((buttons["Right Shoulder"]?.pressedInput.isPressed ?? false) ? 1.0 : 0.0))
+                        }
+                        
+                    }
+                    else {
+                        leftAssociatedButtons = ["Button A", "Button B", "Button X", "Button Y", "Left Thumbstick Button", "Button Home", "Button Menu", "Button Home", "Left Trigger", "Left Shoulder"]
+                        leftAssociatedAxis = ["Left Thumbstick X Axis", "Left Thumbstick Y Axis", "Left Trigger"]
+                        
+                        alvr_send_button(WorldTracker.leftButtonA, boolVal(buttons["Button A"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.leftButtonB, boolVal(buttons["Button B"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.leftButtonX, boolVal(buttons["Button X"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.leftButtonY, boolVal(buttons["Button Y"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.leftThumbstickClick, boolVal(buttons["Left Thumbstick Button"]?.pressedInput.isPressed ?? false))
+                        alvr_send_button(WorldTracker.leftThumbstickX, scalarVal(axes["Left Thumbstick X Axis"]?.absoluteInput?.value ?? 0.0))
+                        alvr_send_button(WorldTracker.leftThumbstickY, scalarVal(axes["Left Thumbstick Y Axis"]?.absoluteInput?.value ?? 0.0))
+                        alvr_send_button(WorldTracker.leftSystemClick, boolVal((buttons["Button Menu"]?.pressedInput.isPressed ?? false) ||
+                                                                               (buttons["Button Home"]?.pressedInput.isPressed ?? false) ))
+                        alvr_send_button(WorldTracker.leftMenuClick, boolVal((buttons["Button Menu"]?.pressedInput.isPressed ?? false) ||
+                                                                             (buttons["Button Home"]?.pressedInput.isPressed ?? false)))
+
+                        if leftPinchTrigger <= 0.0 {
+                            if #available(visionOS 26.0, *) {
+                                alvr_send_button(WorldTracker.leftTriggerValue, scalarVal(buttons["Left Trigger"]?.forceInput?.value ??  ((buttons["Left Trigger"]?.pressedInput.isPressed ?? false) ? 1.0 : 0.0)))
+                            }
+                            else {
+                                alvr_send_button(WorldTracker.leftTriggerValue, scalarVal((buttons["Left Trigger"]?.pressedInput.isPressed ?? false) ? 1.0 : 0.0))
+                            }
+                            alvr_send_button(WorldTracker.leftTriggerClick, boolVal(buttons["Left Trigger"]?.pressedInput.isPressed ?? false))
+                        }
+                        alvr_send_button(WorldTracker.leftSqueezeClick, boolVal(buttons["Left Shoulder"]?.pressedInput.isPressed ?? false))
+                        if #available(visionOS 26.0, *) {
+                            alvr_send_button(WorldTracker.leftSqueezeValue, scalarVal((buttons["Left Shoulder"]?.forceInput?.value ?? ((buttons["Left Shoulder"]?.pressedInput.isPressed ?? false) ? 1.0 : 0.0))))
+                            alvr_send_button(WorldTracker.leftSqueezeForce, scalarVal((buttons["Left Shoulder"]?.forceInput?.value ?? ((buttons["Left Shoulder"]?.pressedInput.isPressed ?? false) ? 1.0 : 0.0))))
+                        }
+                        else {
+                            alvr_send_button(WorldTracker.leftSqueezeValue, scalarVal((buttons["Left Shoulder"]?.pressedInput.isPressed ?? false) ? 1.0 : 0.0))
+                            alvr_send_button(WorldTracker.leftSqueezeForce, scalarVal((buttons["Left Shoulder"]?.pressedInput.isPressed ?? false) ? 1.0 : 0.0))
+                        }
+                    }
+                }
+            }
+            
+            for val in leftAssociatedButtons {
+                if buttons[val]?.pressedInput.isPressed ?? false {
+                    leftSkeletonDisableHysteresis = defaultSkeletonDisableHysteresis
+                }
+            }
+            for val in rightAssociatedButtons {
+                if buttons[val]?.pressedInput.isPressed ?? false {
+                    rightSkeletonDisableHysteresis = defaultSkeletonDisableHysteresis
+                }
+            }
+            for val in leftAssociatedAxis {
+                if abs(axes[val]?.absoluteInput?.value ?? 0.0) > 0.1 {
+                    leftSkeletonDisableHysteresis = defaultSkeletonDisableHysteresis
+                }
+            }
+            for val in rightAssociatedAxis {
+                if abs(axes[val]?.absoluteInput?.value ?? 0.0) > 0.1 {
+                    rightSkeletonDisableHysteresis = defaultSkeletonDisableHysteresis
+                }
+            }
+            for val in leftAssociatedDpads {
+                if (abs(dpads[val]?.xAxis.value ?? 0.0) > 0.1) || (abs(dpads[val]?.yAxis.value ?? 0.0) > 0.1) {
+                    leftSkeletonDisableHysteresis = defaultSkeletonDisableHysteresis
+                }
+            }
+            for val in rightAssociatedDpads {
+                if (abs(dpads[val]?.xAxis.value ?? 0.0) > 0.1) || (abs(dpads[val]?.yAxis.value ?? 0.0) > 0.1) {
+                    rightSkeletonDisableHysteresis = defaultSkeletonDisableHysteresis
+                }
+            }
+            
+            // TODO: Frequency
+            if let haptics = controller.haptics {
+                sendGamepadHaptics(isLeft: isLeft, isBoth: isBoth, isPsvr: isPsvr, haptics: haptics)
+            }
+            
+            // TODO motion fusion
+            /*controller.motion?.valueChangedHandler = { (motion: GCMotion)->() in
+              print(motion.acceleration, motion.rotationRate)
+            }
+            controller.motion?.sensorsActive = true*/
+        }
+    }
+    
+    var lastSentTime = 0.0
+    
+    // TODO: figure out how stable Apple's predictions are into the future
+    // targetTimestamp: The timestamp of the pose we will send to ALVR--capped by how far we can predict forward.
+    // realTargetTimestamp: The timestamp we tell ALVR, which always includes the full round-trip prediction.
+    func sendTracking(viewTransforms: [simd_float4x4], viewFovs: [AlvrFov], targetTimestamp: Double, reportedTargetTimestamp: Double, anchorTimestamp: Double, delay: Double) -> simd_float4x4 {
+        var targetTimestampWalkedBack = targetTimestamp
+        let controllerPredictionTimestamp = targetTimestamp
+        var deviceAnchor:DeviceAnchor? = nil
+        
+        // HACK: In order to get the instantaneous velocity (e.g. with current accelerometer data factored in)
+        // we have to query the last head timestamp again (the anchor will be different than the last time we asked)
+        // HACK: Device anchors have had hidden state in the past, fetch this first
+        var deviceAnchorLastRefetched = worldTracking.queryDeviceAnchor(atTimestamp: lastHeadTimestamp)
+        
+        var skeletonsEnabled = false
+        var steamVRInput2p0Enabled = false
+        var handGesturesEnabled = false
+        if let otherSettings = Settings.getAlvrSettings() {
+            if otherSettings.headset.controllers?.hand_skeleton != nil {
+                skeletonsEnabled = true
+            }
+            if otherSettings.headset.controllers?.hand_skeleton?.steamvr_input_2_0 ?? false {
+                steamVRInput2p0Enabled = true
+            }
+            
+            // For multimodal, send both? idk
+            if otherSettings.headset.controllers?.multimodal_tracking ?? false {
+                steamVRInput2p0Enabled = false
+            }
+            
+            // For hand gestures, always send *only* skeletons
+            if otherSettings.headset.controllers?.hand_tracking_interaction != nil {
+                skeletonsEnabled = true
+                handGesturesEnabled = true
+                steamVRInput2p0Enabled = false
+            }
+        }
+        else {
+            skeletonsEnabled = true
+            steamVRInput2p0Enabled = true
+            handGesturesEnabled = false
+        }
+        
+        Task {
+            for anchor in worldAnchorsToRemove {
+                do {
+                    try await worldTracking.removeAnchor(anchor)
+                }
+                catch {
+                    // don't care
+                }
+                worldAnchors.removeValue(forKey: anchor.id)
+            }
+            worldAnchorsToRemove.removeAll()
+        }
+        
+        // Predict as far into the future as Apple will allow us.
+        for _ in 0...20 {
+            deviceAnchor = worldTracking.queryDeviceAnchor(atTimestamp: targetTimestampWalkedBack)
+            if deviceAnchor != nil {
+                break
+            }
+            targetTimestampWalkedBack -= (5/1000.0)
+        }
+        
+        // Fallback.
+        if deviceAnchor == nil {
+            targetTimestampWalkedBack = CACurrentMediaTime()
+            deviceAnchor = worldTracking.queryDeviceAnchor(atTimestamp: targetTimestampWalkedBack)
+        }
+        
+        if deviceAnchorLastRefetched == nil {
+            deviceAnchorLastRefetched = deviceAnchor // Fallback
+        }
+
+        // Well, I'm out of ideas.
+        guard let deviceAnchor = deviceAnchor else {
+            print("Failed to get device anchor for future prediction!!")
+            // Prevent audio crackling issues
+            if sentPoses > 30 {
+                // Yayyy they fixed it, but this also caused audio to cut out for random device anchor failures...
+                if #unavailable(visionOS 2.0) {
+                    EventHandler.shared.handleHeadsetRemoved()
+                }
+            }
+            return matrix_identity_float4x4
+        }
+        
+        // This is kinda fiddly: worldTracking doesn't have a way to get a list of existing anchors,
+        // and addAnchor only works while fully immersed mode is fully running.
+        // So we have to sandwich it in here where we know worldTracking is online.
+        //
+        // That aside, if we add an anchor at (0,0,0), we will get reports in processWorldTrackingUpdates()
+        // every time the user recenters.
+        if (!self.worldTrackingAddedOriginAnchor && sentPoses > 300) || (!self.worldTrackingAddedOriginAnchor && !ALVRClientApp.gStore.settings.keepSteamVRCenter) {
+            if self.worldOriginAnchor == nil && ALVRClientApp.gStore.settings.keepSteamVRCenter {
+                self.worldOriginAnchor = WorldAnchor(originFromAnchorTransform: matrix_identity_float4x4)
+                self.worldTrackingSteamVRTransform = matrix_identity_float4x4
+                
+                Task {
+                    do {
+                        try await worldTracking.addAnchor(self.worldOriginAnchor!)
+                    }
+                    catch {
+                        // don't care
+                    }
+                }
+            }
+            
+            self.worldTrackingAddedOriginAnchor = true
+            print("anchor finalized")
+        }
+        sentPoses += 1
+        
+        //let targetTimestampNS = UInt64(targetTimestampWalkedBack * Double(NSEC_PER_SEC))
+        let reportedTargetTimestampNS = UInt64(reportedTargetTimestamp * Double(NSEC_PER_SEC))
+
+        floorCorrectionTransform = simd_float3() // TODO: Set floor height to plane provider floor height? Raycast it dynamically? idk.
+#if XCODE_BETA_16
+        if #available(visionOS 2.0, *) {
+            // TODO: This might be the height of my carpet lol
+            //floorCorrectionTransform.y = averageViewTransformPositionalComponent.y * 0.5
+        }
+#endif
+
+        var appleOriginFromAnchor = deviceAnchor.originFromAnchorTransform
+        appleOriginFromAnchor.columns.3 += floorCorrectionTransform.asFloat4()
+        WorldTracker.shared.currentAppleOriginFromAnchor = appleOriginFromAnchor
+        
+        var appleOriginFromAnchorLastRefetched = deviceAnchorLastRefetched?.originFromAnchorTransform ?? deviceAnchor.originFromAnchorTransform
+        appleOriginFromAnchorLastRefetched.columns.3 += floorCorrectionTransform.asFloat4()
+        
+        // Apply the SteamVR transform so that SteamVR center/bounds don't move when the headset recenters, if the user
+        // selected that option
+        let transform = self.worldTrackingSteamVRTransform.inverse * appleOriginFromAnchor
+        let transformLastRefetched = self.worldTrackingSteamVRTransform.inverse * appleOriginFromAnchorLastRefetched
+        let leftTransform = transform * viewTransforms[0]
+        let rightTransform = transform * viewTransforms[1]
+        
+        let leftOrientation = simd_quaternion(leftTransform)
+        let leftPosition = leftTransform.columns.3
+        let rightOrientation = simd_quaternion(rightTransform)
+        let rightPosition = rightTransform.columns.3
+        
+        let leftTransformHeadLocal = viewTransforms[0]
+        let rightTransformHeadLocal = viewTransforms[1]
+        
+        let leftOrientationHeadLocal = simd_quaternion(leftTransformHeadLocal)
+        let leftPositionHeadLocal = leftTransformHeadLocal.columns.3
+        let leftPoseHeadLocal = AlvrPose(leftOrientationHeadLocal, leftPositionHeadLocal)
+        let rightOrientationHeadLocal = simd_quaternion(rightTransformHeadLocal)
+        let rightPositionHeadLocal = rightTransformHeadLocal.columns.3
+        let rightPoseHeadLocal = AlvrPose(rightOrientationHeadLocal, rightPositionHeadLocal)
+        
+        var trackingMotions:[AlvrDeviceMotion] = []
+        var skeletonLeft:[AlvrPose]? = nil
+        var skeletonRight:[AlvrPose]? = nil
+        
+        var skeletonLeftPtr:UnsafeMutablePointer<AlvrPose>? = nil
+        var skeletonRightPtr:UnsafeMutablePointer<AlvrPose>? = nil
+        
+        var eyeGazeLeftPtr:UnsafeMutablePointer<AlvrPose>? = nil
+        var eyeGazeRightPtr:UnsafeMutablePointer<AlvrPose>? = nil
+        
+        var fbFaceExpressions:UnsafeMutablePointer<Float32>? = nil
+        
+        if self.fbFaceTrackingValid {
+            fbFaceExpressions = UnsafeMutablePointer<Float32>.allocate(capacity: 70)
+        }
+        
+        eyeGazeLeftPtr = UnsafeMutablePointer<AlvrPose>.allocate(capacity: 1)
+        eyeGazeRightPtr = UnsafeMutablePointer<AlvrPose>.allocate(capacity: 1)
+
+        // MARK: - Gaze extraction stuff
+
+        // To get the most accurate rotations, we have each eye look at the in-space coordinates
+        // we know the HoverEffect is reporting
+        var qL = simd_quatf()
+        var qR = simd_quatf()
+        
+        // TODO: Attach SteamVR controller to eyes for input anticipation/hovers.
+        // Needs the gazes to be as accurate as the pinch events.
+        let appleLeft = appleOriginFromAnchor * viewTransforms[0]
+        let appleRight = appleOriginFromAnchor * viewTransforms[1]
+
+        // TODO: Actually get this to be as accurate as the gaze ray, currently it is not.
+        if self.fbFaceTrackingValid {
+            var directionTargetL = simd_float3()
+            var directionTargetR = simd_float3()
+            
+            // TODO: I'm honestly not sure which one is correct because tilting my head seems to throw the
+            // gaze on the Persona avatar anyhow
+            /*let leftBasisL = viewTransforms[0].columns.0.asFloat3()
+            let leftBasisR = viewTransforms[1].columns.0.asFloat3()
+            let upBasisL = viewTransforms[0].columns.1.asFloat3()
+            let upBasisR = viewTransforms[1].columns.1.asFloat3()
+            let outBasisL = viewTransforms[0].columns.2.asFloat3()
+            let outBasisR = viewTransforms[1].columns.2.asFloat3()*/
+            
+            /*let leftBasisL = leftTransform.columns.0.asFloat3()
+            let leftBasisR = rightTransform.columns.0.asFloat3()
+            let upBasisL = leftTransform.columns.1.asFloat3()
+            let upBasisR = rightTransform.columns.1.asFloat3()
+            let outBasisL = leftTransform.columns.2.asFloat3()
+            let outBasisR = rightTransform.columns.2.asFloat3()*/
+            
+            let leftBasisL = transform.columns.0.asFloat3()
+            let leftBasisR = transform.columns.0.asFloat3()
+            let upBasisL = transform.columns.1.asFloat3()
+            let upBasisR = transform.columns.1.asFloat3()
+            let outBasisL = transform.columns.2.asFloat3()
+            let outBasisR = transform.columns.2.asFloat3()
+            
+            /*let leftBasisL = simd_float3(1.0, 0.0, 0.0)
+            let leftBasisR = simd_float3(1.0, 0.0, 0.0)
+            let upBasisL = simd_float3(0.0, 1.0, 0.0)
+            let upBasisR = simd_float3(0.0, 1.0, 0.0)
+            let outBasisL = simd_float3(0.0, 0.0, 1.0)
+            let outBasisR = simd_float3(0.0, 0.0, 1.0)*/
+            
+            var leftRightL = Float((-self.fbFaceTracking[XrFaceExpression2FB.eyesLookLeftR.rawValue] + self.fbFaceTracking[XrFaceExpression2FB.eyesLookRightR.rawValue]))
+            var leftRightR = Float((-self.fbFaceTracking[XrFaceExpression2FB.eyesLookLeftL.rawValue] + self.fbFaceTracking[XrFaceExpression2FB.eyesLookRightL.rawValue]))
+            
+            let upDownLRaw = Float((-self.fbFaceTracking[XrFaceExpression2FB.eyesLookUpR.rawValue] + self.fbFaceTracking[XrFaceExpression2FB.eyesLookDownR.rawValue]))
+            let upDownRRaw = Float((-self.fbFaceTracking[XrFaceExpression2FB.eyesLookUpL.rawValue] + self.fbFaceTracking[XrFaceExpression2FB.eyesLookDownL.rawValue]))
+            var upDownL = upDownLRaw//(upDownLRaw + upDownRRaw) * 0.5
+            var upDownR = upDownRRaw//(upDownLRaw + upDownRRaw) * 0.5
+            
+            // TODO: pull this from gaze pinches
+            //let test = Float(sin(CACurrentMediaTime() * 0.1) * 0.05) - 0.10
+            let leftRightCalib: Float = -0.10
+            leftRightL += leftRightCalib
+            leftRightR += leftRightCalib
+            
+            // tbqh I don't think this math works
+            if leftRightL < 0.0 {
+                leftRightL = asin(leftRightL)
+            }
+            else {
+                leftRightL = asin(leftRightL) * 0.9
+            }
+            
+            if leftRightR < 0.0 {
+                leftRightR = asin(leftRightR)
+            }
+            else {
+                leftRightR = asin(leftRightR) * 0.9
+            }
+            
+            //let test = Float(sin(CACurrentMediaTime() * 0.5)) + 1.0
+            //print(test)
+            
+            // TODO idk why it's like this
+            // TODO: autocalibrate on pinches
+            // TODO: The upper gaze keeps flipping between needing the 0.5 mult and not
+            if upDownL < 0.0 {
+                upDownL = -asin(-upDownL) * 1.0
+            }
+            else {
+                //upDownL *= 1.0
+                upDownL = asin(upDownL) * 0.5
+            }
+            
+            if upDownR < 0.0 {
+                upDownR = -asin(-upDownR) * 1.0
+            }
+            else {
+                //upDownR *= 1.0
+                upDownR = asin(upDownR) * 0.5
+            }
+            
+            directionTargetL += leftBasisL * (leftRightL * 50.0)
+            directionTargetR += leftBasisR * (leftRightR * 50.0)
+            
+            directionTargetL += upBasisL * (upDownL * 50.0)
+            directionTargetR += upBasisR * (upDownR * 50.0)
+            
+            directionTargetL += outBasisL * Float(50.0)
+            directionTargetR += outBasisR * Float(50.0)
+            
+            /*let directionL = viewTransforms[0].columns.3.asFloat3() - directionTargetL
+            let directionR = viewTransforms[1].columns.3.asFloat3() - directionTargetR
+            let orientL = simd_look(at: -directionL)
+            let orientR = simd_look(at: -directionR)*/
+            
+            let directionL = leftEyeFilter.filter(directionTargetL, timestamp: CACurrentMediaTime())
+            let directionR = rightEyeFilter.filter(directionTargetR, timestamp: CACurrentMediaTime())
+            
+            let orientL = simd_look(at: directionL)
+            let orientR = simd_look(at: directionR)
+            
+            qL = simd_quaternion(orientL)
+            qR = simd_quaternion(orientR)
+            
+            // Weird: The orientation I get from qL is consistent with the ray direction from the
+            // *combined* ray, not the left ray.
+            // Also the depth is off by 4x for some reason, but it does seem weirdly accurate
+            let depth = vergenceDepthTest2(leftTransform.translationOnly() * orientL, rightTransform.translationOnly() * orientR)
+            let averageLeftRight = (leftTransform.columns.3.asFloat3() + rightTransform.columns.3.asFloat3()) * 0.5
+            let fullCombinedTransform = averageLeftRight.asFloat4x4() * orientL
+            //let fullCombinedTransform = transform * orientL
+            //print("depth1", depth)
+            WorldTracker.shared.currentVergenceDepth = depth
+            let combinedForward = (-fullCombinedTransform.columns.2.asFloat3() * depth) + fullCombinedTransform.columns.3.asFloat3() //+ viewTransforms[0].columns.3.asFloat3()// + ((viewTransforms[0].columns.3.asFloat3() + viewTransforms[1].columns.3.asFloat3()) * 0.5)
+            let directionLFix = leftTransform.columns.3.asFloat3() - combinedForward
+            let directionRFix = rightTransform.columns.3.asFloat3() - combinedForward
+            
+            let orientLFix = simd_look(at: directionLFix)
+            let orientRFix = simd_look(at: directionRFix)
+            
+            //qL = simd_quaternion(orientLFix)
+            //qR = simd_quaternion(orientRFix)
+
+#if false
+            if rightIsPinching {
+                let verifyAppleOriginFromAnchor = deviceAnchor.originFromAnchorTransform
+                let verifyAppleHeadPosition = verifyAppleOriginFromAnchor.columns.3.asFloat3()
+                let verifyLeftTransform = verifyAppleOriginFromAnchor * viewTransforms[0]
+                let verifyRightTransform = verifyAppleOriginFromAnchor * viewTransforms[1]
+                
+                let leftOrientationApple = simd_quaternion(verifyLeftTransform)
+                let leftOrientationApple2 = simd_quaternion(verifyAppleOriginFromAnchor)
+                let qCApple = leftOrientationApple * simd_quaternion(orientL)
+                let directionCNorm = qCApple.act(simd_float3(0.0, 0.0, -1.0))//orientL.columns.2.asFloat3()
+                
+                let qLApple = leftOrientationApple * simd_quaternion(orientLFix)
+                let directionLNorm = qLApple.act(simd_float3(0.0, 0.0, -1.0))//orientL.columns.2.asFloat3()
+                
+                let rightOrientationApple = simd_quaternion(verifyRightTransform)
+                let qRApple = rightOrientationApple * simd_quaternion(orientRFix)
+                let directionRNorm = qRApple.act(simd_float3(0.0, 0.0, -1.0))//orientL.columns.2.asFloat3()
+                
+                /*print(rightSelectionRayOrigin, rightSelectionRayDirection, directionLNorm, rightSelectionRayDirection-directionLNorm, simd_distance(rightSelectionRayDirection, directionLNorm))
+                print(rightSelectionRayOrigin, rightSelectionRayDirection, directionRNorm, rightSelectionRayDirection-directionRNorm, simd_distance(rightSelectionRayDirection, directionRNorm))*/
+                
+                
+                
+                let rayOrigin = rightSelectionRayOrigin
+                //let rayOrigin = leftTransform.columns.3.asFloat3()
+                
+                var testL = ((rayOrigin - verifyAppleHeadPosition).asFloat4() * verifyAppleOriginFromAnchor).asFloat3()
+                testL -= viewTransforms[0].columns.3.asFloat3()
+                var testR = ((rayOrigin - verifyAppleHeadPosition).asFloat4() * verifyAppleOriginFromAnchor).asFloat3()
+                testR -= viewTransforms[1].columns.3.asFloat3()
+                let test2 = rightSelectionRayOrigin - verifyLeftTransform.columns.3.asFloat3()
+                print("verifying vs left eye transform, difference:")
+                print("Test L:", testL, simd_distance(rightSelectionRayDirection, directionLNorm))
+                print("Test R:", testR, simd_distance(rightSelectionRayDirection, directionRNorm))
+                print("Test C:", simd_distance(rightSelectionRayDirection, directionCNorm))
+                print("Test 2:", test2)
+            }
+            
+            leftSelectionRayOrigin = (appleOriginFromAnchor).columns.3.asFloat3()
+            leftSelectionRayDirection = -(appleOriginFromAnchor * orientL).columns.2.asFloat3()//simd_normalize(leftSelectionRayOrigin - directionTargetApple.asFloat3())
+            leftPinchEyeDelta = simd_float3()
+            leftPinchStartPosition = simd_float3()
+            leftPinchCurrentPosition = simd_float3()
+            //leftIsPinching = true
+#endif
+        }
+        else if eyeIsMipmapMethod {
+            var directionTarget = simd_float3()
+            if eyeX < 0.0 {
+                directionTarget.x = -eyeX * 0.5 * (DummyMetalRenderer.renderTangents[0].x) * 50.0 // left
+            }
+            else {
+                directionTarget.x = -eyeX * 0.7435 * (DummyMetalRenderer.renderTangents[0].y) * 50.0 // right
+            }
+            if eyeY < 0.0 {
+                directionTarget.y = eyeY * 0.65209925 * (DummyMetalRenderer.renderTangents[0].z) * 50.0 // top
+            }
+            else {
+                directionTarget.y = eyeY * 0.5784546 * (DummyMetalRenderer.renderTangents[0].w) * 50.0 // bottom
+            }
+            directionTarget.z = 50.0
+            
+            let directionL = viewTransforms[0].columns.3.asFloat3() - directionTarget
+            let directionR = viewTransforms[1].columns.3.asFloat3() - directionTarget
+            let orientL = simd_look(at: -directionL)
+            let orientR = simd_look(at: -directionR)
+            qL = leftOrientation * simd_quaternion(orientL)
+            qR = rightOrientation * simd_quaternion(orientR)
+
+            if leftIsPinching {
+                //print(eyeX, eyeY, val)
+            }
+        
+            let directionTargetApple = appleLeft * directionTarget.asFloat4_1()
+#if false
+            leftSelectionRayOrigin = appleLeft.columns.3.asFloat3()
+            leftSelectionRayDirection = simd_normalize(leftSelectionRayOrigin - directionTargetApple.asFloat3())
+            //leftPinchEyeDelta = simd_float3()
+            leftPinchStartPosition = simd_float3()
+            leftPinchCurrentPosition = simd_float3()
+            //leftIsPinching = true
+#endif
+        }
+        else {
+            //let val = Float(sin(CACurrentMediaTime() * 0.125) + 1.0)
+            let panelWidth = max(DummyMetalRenderer.renderTangents[0].x, DummyMetalRenderer.renderTangents[1].x) + max(DummyMetalRenderer.renderTangents[0].y, DummyMetalRenderer.renderTangents[1].y)
+            //let panelWidth = DummyMetalRenderer.renderTangents[0].x + DummyMetalRenderer.renderTangents[1].x
+            let panelHeight = max(DummyMetalRenderer.renderTangents[0].z, DummyMetalRenderer.renderTangents[1].z) + max(DummyMetalRenderer.renderTangents[0].w, DummyMetalRenderer.renderTangents[1].w)
+            var directionTarget = simd_float3()
+            var eyeXMod = eyeX
+            var eyeYMod = eyeY
+            if eyeXMod < 0.0 {
+                eyeXMod *= DummyMetalRenderer.renderTangents[0].x * 0.5 // left
+            }
+            else {
+                eyeXMod *= DummyMetalRenderer.renderTangents[0].y * 2.0 // right
+            }
+            if eyeYMod > 0.0 {
+                eyeYMod *= DummyMetalRenderer.renderTangents[0].w * 1.3511884 // bottom
+            }
+            else {
+                eyeYMod *= DummyMetalRenderer.renderTangents[0].z * 2.0 // top
+            }
+            
+            // wtf
+            if eyeXMod > 0.0 {
+                eyeYMod -= eyeXMod * 0.5912685
+            }
+            //directionTarget.x = -eyeXMod * panelWidth * 50.0 // left
+            //directionTarget.y = eyeY * panelHeight * 50.0 // top
+            //directionTarget.z = 50.0
+            directionTarget.x = -eyeXMod * panelWidth * rk_panel_depth * 0.5 * 0.5
+            directionTarget.y = eyeYMod * panelHeight * rk_panel_depth * 0.5 * 0.5
+            directionTarget.z = rk_panel_depth * 0.5
+            
+            let directionL = viewTransforms[0].columns.3.asFloat3() - directionTarget
+            let directionR = viewTransforms[1].columns.3.asFloat3() - directionTarget
+            let orientL = simd_look(at: -directionL)
+            let orientR = simd_look(at: -directionR)
+            qL = leftOrientation * simd_quaternion(orientL)
+            qR = rightOrientation * simd_quaternion(orientR)
+
+            if leftIsPinching {
+                //print(eyeXMod, eyeYMod, val)
+            }
+        
+            let directionTargetApple = appleOriginFromAnchor * directionTarget.asFloat4_1()
+#if false
+            leftSelectionRayOrigin = appleOriginFromAnchor.columns.3.asFloat3()
+            leftSelectionRayDirection = simd_normalize(leftSelectionRayOrigin - directionTargetApple.asFloat3())
+            //leftPinchEyeDelta = simd_float3()
+            leftPinchStartPosition = simd_float3()
+            leftPinchCurrentPosition = simd_float3()
+            //leftIsPinching = true
+#endif
+        }
+        
+        eyeGazeLeftPtr?[0] = AlvrPose(qL, leftTransform.columns.3.asFloat3())
+        eyeGazeRightPtr?[0] = AlvrPose(qR, rightTransform.columns.3.asFloat3())
+        
+        // MARK: - Hand poses and various interop for Q3 heuristics
+        var handPoses: (leftHand: HandAnchor?, rightHand: HandAnchor?) = (nil, nil)
+        if handTracking.state == .running {
+#if XCODE_BETA_16
+            if #available(visionOS 2.0, *) {
+                handPoses = handTracking.handAnchors(at: anchorTimestamp)
+            }
+            else {
+                handPoses = handTracking.latestAnchors
+            }
+#else
+            handPoses = handTracking.latestAnchors
+#endif
+        }
+
+        // The Steam Controller has no anchor of its own, so its pose is solved
+        // here, where the hands that are holding it are already in hand.
+        updateSteamControllerFusion(handPoses.leftHand, handPoses.rightHand, anchorTimestamp)
+
+        // Skeleton disabling for SteamVR input 2.0
+        leftSkeletonDisableHysteresis -= 0.01
+        if leftSkeletonDisableHysteresis <= 0.0 {
+            leftSkeletonDisableHysteresis = 0.0
+        }
+        rightSkeletonDisableHysteresis -= 0.01
+        if rightSkeletonDisableHysteresis <= 0.0 {
+            rightSkeletonDisableHysteresis = 0.0
+        }
+        
+        // Disable the hysteresis if input 2.0 isn't enabled,
+        // disable skeletons with the hysteresis if skeletons are disabled
+        if !skeletonsEnabled {
+            leftSkeletonDisableHysteresis = defaultSkeletonDisableHysteresis
+            rightSkeletonDisableHysteresis = defaultSkeletonDisableHysteresis
+        }
+        else if !steamVRInput2p0Enabled {
+            leftSkeletonDisableHysteresis = 0.0
+            rightSkeletonDisableHysteresis = 0.0
+        }
+
+        // A held Steam Controller has to win over hand tracking the way a real
+        // controller does. Nothing else refreshes the hysteresis for it: it is
+        // not a GCController, so the `*AssociatedButtons` loops in
+        // sendGamepadInputs() never see it, and under SteamVR input 2.0 the
+        // skeletons kept being sent and kept overriding the controllers.
+        //
+        // Held rather than pressed on purpose — holding the thing is the intent
+        // to use it. Waiting for a button means the hands don't go away until
+        // you press something, and let go and it drops back to hands on its own.
+        // Resolved per hand, so letting go with one hand returns that hand to
+        // hand tracking while the other keeps driving a controller.
+        if steamControllerHandIsActive(isLeft: true) && skeletonsEnabled && steamVRInput2p0Enabled {
+            leftSkeletonDisableHysteresis = defaultSkeletonDisableHysteresis
+            steamControllerHeldHysteresisLeft = true
+        }
+        else if steamControllerHeldHysteresisLeft {
+            // Falling edge: put it down and the hand should come straight back.
+            // Letting the 5s hysteresis decay out instead would take ~5.5s at
+            // this call rate, which does not read as "swapped to hands" — it
+            // reads as hand tracking being broken. A real GCController re-raises
+            // this on its next input, and the pinch handling below can still
+            // raise it again this frame.
+            steamControllerHeldHysteresisLeft = false
+            if skeletonsEnabled && steamVRInput2p0Enabled {
+                leftSkeletonDisableHysteresis = 0.0
+            }
+        }
+        if steamControllerHandIsActive(isLeft: false) && skeletonsEnabled && steamVRInput2p0Enabled {
+            rightSkeletonDisableHysteresis = defaultSkeletonDisableHysteresis
+            steamControllerHeldHysteresisRight = true
+        }
+        else if steamControllerHeldHysteresisRight {
+            steamControllerHeldHysteresisRight = false
+            if skeletonsEnabled && steamVRInput2p0Enabled {
+                rightSkeletonDisableHysteresis = 0.0
+            }
+        }
+        
+        // MARK: - Controller clack-together to enable hand tracking
+        let leftPosApple = leftControllerPose?.columns.3.asFloat3() ?? simd_float3()
+        let rightPosApple = rightControllerPose?.columns.3.asFloat3() ?? simd_float3()
+        let headsetZForwardForClack = appleOriginFromAnchor.columns.3.asFloat3() + (appleOriginFromAnchor.columns.2.asFloat3() * -0.25) // We use the Z-basis to weight the distance towards actually looking at the controllers, to prevent misfires
+        let leftRightDist = simd_distance(leftPosApple, rightPosApple)
+        let leftDistToHeadset = simd_distance(leftPosApple, headsetZForwardForClack)
+        let rightDistToHeadset = simd_distance(rightPosApple, headsetZForwardForClack)
+        let leftVelMag = simd_distance(simd_float3(), leftControllerLinVel)
+        let rightVelMag = simd_distance(simd_float3(), rightControllerLinVel)
+        let leftAcc = leftControllerLastLinVel - leftControllerLinVel
+        let rightAcc = rightControllerLastLinVel - rightControllerLinVel
+        let leftMag = simd_distance(simd_float3(), leftAcc)
+        let rightMag = simd_distance(simd_float3(), rightAcc)
+        let crossMag = simd_distance(simd_float3(), simd_cross(leftAcc, rightAcc))
+        let dotLeftRight = simd_dot(leftControllerLastLinVel, rightControllerLastLinVel)
+        let validClickTogether = (leftMag > 0.1 && rightMag > 0.1)
+            && (leftMag < 0.5 && rightMag < 0.5)
+            && leftDistToHeadset < 0.25
+            && rightDistToHeadset < 0.25
+            && leftRightDist < 0.17
+        if validClickTogether && (CACurrentMediaTime() - firstControllerClickTime) > 1.0 {
+            firstControllerClickTime = CACurrentMediaTime()
+            secondControllerClickTime = 0.0
+            print("first clack", leftMag, rightMag, leftVelMag, rightVelMag, crossMag, dotLeftRight, leftRightDist, leftDistToHeadset, rightDistToHeadset)
+        }
+        else if validClickTogether && (CACurrentMediaTime() - firstControllerClickTime) > 0.2 && (CACurrentMediaTime() - secondControllerClickTime) > 1.0 {
+            secondControllerClickTime = CACurrentMediaTime()
+            print("second clack", leftMag, rightMag, leftVelMag, rightVelMag, crossMag, dotLeftRight, leftRightDist, leftDistToHeadset, rightDistToHeadset)
+            if ALVRClientApp.gStore.settings.enableDoubleTapForHands {
+                controllersAreDisabledByClickTogether = !controllersAreDisabledByClickTogether
+            }
+        }
+        else if validClickTogether {
+            print("other clack", leftMag, rightMag, crossMag, dotLeftRight, leftRightDist, CACurrentMediaTime() - firstControllerClickTime)
+        }
+        leftControllerLastLinVel = leftControllerLinVel
+        rightControllerLastLinVel = rightControllerLinVel
+
+        // MARK: Hand poses/controller poses to ALVR motions
+        if let leftHand = handPoses.leftHand {
+            let handMotion = handAnchorToAlvrDeviceMotion(leftHand, controllerPredictionTimestamp)
+            
+            // Hand motion overrides skeletons, so only send either or
+            if leftHand.isTracked && leftSkeletonDisableHysteresis <= 0.0 {
+                skeletonLeft = handAnchorToSkeleton(leftHand)
+                if !steamVRInput2p0Enabled {
+                    trackingMotions.append(handMotion)
+                }
+            }
+            else {
+                trackingMotions.append(handMotion)
+            }
+        }
+        if let rightHand = handPoses.rightHand {
+            let handMotion = handAnchorToAlvrDeviceMotion(rightHand, controllerPredictionTimestamp)
+
+            
+            // Hand motion overrides skeletons, so only send either or
+            if rightHand.isTracked && rightSkeletonDisableHysteresis <= 0.0 {
+                skeletonRight = handAnchorToSkeleton(rightHand)
+                if !steamVRInput2p0Enabled {
+                    trackingMotions.append(handMotion)
+                }
+            }
+            else {
+                trackingMotions.append(handMotion)
+            }
+        }
+        
+        // Controllers override hand simulated controllers
+        let controllerLeftMotion = controllerToAlvrDeviceMotion(true, controllerPredictionTimestamp)
+        let controllerRightMotion = controllerToAlvrDeviceMotion(false, controllerPredictionTimestamp)
+        if controllerLeftMotion != nil {
+            trackingMotions.removeAll(where: {$0.device_id == WorldTracker.deviceIdLeftHand })
+            trackingMotions.append(controllerLeftMotion!)
+        }
+        if controllerRightMotion != nil {
+            trackingMotions.removeAll(where: {$0.device_id == WorldTracker.deviceIdRightHand })
+            trackingMotions.append(controllerRightMotion!)
+        }
+
+        // Steam Controller overrides hand-simulated controllers too. It runs
+        // after the spatial-accessory override rather than inside it because
+        // that path is keyed off an ARKit AccessoryAnchor this device does not
+        // have; a real tracked controller still wins if somehow both are up.
+        if controllerLeftMotion == nil, let steamLeft = steamControllerToAlvrDeviceMotion(true, controllerPredictionTimestamp) {
+            trackingMotions.removeAll(where: {$0.device_id == WorldTracker.deviceIdLeftHand })
+            trackingMotions.append(steamLeft)
+        }
+        if controllerRightMotion == nil, let steamRight = steamControllerToAlvrDeviceMotion(false, controllerPredictionTimestamp) {
+            trackingMotions.removeAll(where: {$0.device_id == WorldTracker.deviceIdRightHand })
+            trackingMotions.append(steamRight)
+        }
+        
+        // For hand gestures, we have to avoid sending controller motions
+        if handGesturesEnabled {
+            if skeletonLeft != nil {
+                trackingMotions.removeAll(where: {$0.device_id == WorldTracker.deviceIdLeftHand })
+            }
+            if skeletonRight != nil {
+                trackingMotions.removeAll(where: {$0.device_id == WorldTracker.deviceIdRightHand })
+            }
+        }
+        
+        func boolVal(_ val: Bool) -> AlvrButtonValue {
+            return AlvrButtonValue(tag: ALVR_BUTTON_VALUE_BINARY, AlvrButtonValue.__Unnamed_union___Anonymous_field1(AlvrButtonValue.__Unnamed_union___Anonymous_field1.__Unnamed_struct___Anonymous_field0(binary: val)))
+        }
+        
+        func scalarVal(_ val: Float) -> AlvrButtonValue {
+            return AlvrButtonValue(tag: ALVR_BUTTON_VALUE_SCALAR, AlvrButtonValue.__Unnamed_union___Anonymous_field1(AlvrButtonValue.__Unnamed_union___Anonymous_field1.__Unnamed_struct___Anonymous_field1(scalar: val)))
+        }
+        
+        // MARK: - Emulated pinch interactions overwrite emulated controller motions
+        if ALVRClientApp.gStore.settings.emulatedPinchInteractions {
+            // Menu press with two pinches
+            // (have to override triggers to prevent screenshot send)
+            var systemButton = WorldTracker.leftMenuClick
+            var systemIsRight = false
+            if let otherSettings = Settings.getAlvrSettings() {
+                let emulationMode = otherSettings.headset.controllers?.emulation_mode ?? ""
+                if emulationMode == "PSVR2Sense" {
+                    systemButton = WorldTracker.rightSystemClick
+                    systemIsRight = true
+                }
+            }
+            
+            let deltaSinceLastPinch = Float(max(CACurrentMediaTime() - lastPinchSentTime, 0.011))
+            lastPinchSentTime = CACurrentMediaTime()
+            
+            let skeletonHysteresisForPinches = defaultSkeletonDisableHysteresis
+            let pinchTriggerSpeed: Float = 0.15 * (deltaSinceLastPinch / 0.011)
+            
+            if (rightIsPinching && leftIsPinching) {
+                leftPinchTrigger -= pinchTriggerSpeed
+                if leftPinchTrigger < 0.0 {
+                    leftPinchTrigger = pinchTriggerSpeed
+                }
+                rightPinchTrigger -= pinchTriggerSpeed
+                if rightPinchTrigger < 0.0 {
+                    rightPinchTrigger = pinchTriggerSpeed
+                }
+                
+                bothPinchSystemButtonTime += pinchTriggerSpeed
+                if bothPinchSystemButtonTime > 1.0 {
+                    bothPinchSystemButtonTime = 1.0
+                }
+
+                if leftPinchTrigger <= pinchTriggerSpeed && rightPinchTrigger <= pinchTriggerSpeed && bothPinchSystemButtonTime < 0.3 {
+                    alvr_send_button(systemButton, boolVal(true))
+                }
+                else {
+                    alvr_send_button(systemButton, boolVal(false))
+                }
+                
+                if (!systemIsRight) {
+                    alvr_send_button(WorldTracker.leftTriggerClick, boolVal(leftPinchTrigger > 0.7))
+                    alvr_send_button(WorldTracker.leftTriggerValue, scalarVal(leftPinchTrigger))
+                    //alvr_send_button(WorldTracker.rightTriggerClick, boolVal(false))
+                    //alvr_send_button(WorldTracker.rightTriggerValue, scalarVal(0.0))
+                }
+                else {
+                    //alvr_send_button(WorldTracker.leftTriggerClick, boolVal(false))
+                    //alvr_send_button(WorldTracker.leftTriggerValue, scalarVal(0.0))
+                    alvr_send_button(WorldTracker.rightTriggerClick, boolVal(rightPinchTrigger > 0.7))
+                    alvr_send_button(WorldTracker.rightTriggerValue, scalarVal(rightPinchTrigger))
+                }
+                
+                trackingMotions.removeAll(where: {$0.device_id == WorldTracker.deviceIdLeftHand })
+                trackingMotions.removeAll(where: {$0.device_id == WorldTracker.deviceIdRightHand })
+                
+                trackingMotions.append(pinchToAlvrDeviceMotion(.left))
+                trackingMotions.append(pinchToAlvrDeviceMotion(.right))
+                
+                if steamVRInput2p0Enabled {
+                    leftSkeletonDisableHysteresis = skeletonHysteresisForPinches
+                    rightSkeletonDisableHysteresis = skeletonHysteresisForPinches
+                    skeletonLeft = nil
+                    skeletonRight = nil
+                }
+            }
+            else {
+                bothPinchSystemButtonTime = 0.0
+
+                if leftIsPinching {
+                    trackingMotions.removeAll(where: {$0.device_id == WorldTracker.deviceIdLeftHand })
+                    trackingMotions.append(pinchToAlvrDeviceMotion(.left))
+                    alvr_send_button(WorldTracker.leftTriggerClick, boolVal(leftPinchTrigger > 0.7))
+                    alvr_send_button(WorldTracker.leftTriggerValue, scalarVal(leftPinchTrigger))
+                    leftPinchTrigger += pinchTriggerSpeed
+                    if leftPinchTrigger > 1.0 {
+                        leftPinchTrigger = 1.0
+                    }
+                    
+                    if steamVRInput2p0Enabled{
+                        leftSkeletonDisableHysteresis = skeletonHysteresisForPinches
+                        skeletonLeft = nil
+                    }
+                }
+                else if !leftIsPinching && leftPinchTrigger > 0.0 {
+                    trackingMotions.removeAll(where: {$0.device_id == WorldTracker.deviceIdLeftHand })
+                    trackingMotions.append(pinchToAlvrDeviceMotion(.left))
+                    alvr_send_button(WorldTracker.leftTriggerClick, boolVal(leftPinchTrigger > 0.7))
+                    alvr_send_button(WorldTracker.leftTriggerValue, scalarVal(leftPinchTrigger))
+                    leftPinchTrigger -= pinchTriggerSpeed
+                    if leftPinchTrigger <= pinchTriggerSpeed {
+                        WorldTracker.shared.leftSelectionRayOrigin = simd_float3()
+                        WorldTracker.shared.leftSelectionRayDirection = simd_float3()
+                    }
+                    if leftPinchTrigger < 0.0 {
+                        leftPinchTrigger = 0.0
+                    }
+                    if steamVRInput2p0Enabled {
+                        leftSkeletonDisableHysteresis = skeletonHysteresisForPinches
+                        skeletonLeft = nil
+                    }
+                }
+                
+                if rightIsPinching {
+                    trackingMotions.removeAll(where: {$0.device_id == WorldTracker.deviceIdRightHand })
+                    trackingMotions.append(pinchToAlvrDeviceMotion(.right))
+                    alvr_send_button(WorldTracker.rightTriggerClick, boolVal(rightPinchTrigger > 0.7))
+                    alvr_send_button(WorldTracker.rightTriggerValue, scalarVal(rightPinchTrigger))
+                    rightPinchTrigger += pinchTriggerSpeed
+                    if rightPinchTrigger > 1.0 {
+                        rightPinchTrigger = 1.0
+                    }
+                    
+                    if steamVRInput2p0Enabled {
+                        rightSkeletonDisableHysteresis = skeletonHysteresisForPinches
+                        skeletonRight = nil
+                    }
+                }
+                else if !rightIsPinching && rightPinchTrigger > 0.0 {
+                    trackingMotions.removeAll(where: {$0.device_id == WorldTracker.deviceIdRightHand })
+                    trackingMotions.append(pinchToAlvrDeviceMotion(.right))
+                    alvr_send_button(WorldTracker.rightTriggerClick, boolVal(rightPinchTrigger > 0.7))
+                    alvr_send_button(WorldTracker.rightTriggerValue, scalarVal(rightPinchTrigger))
+                    rightPinchTrigger -= pinchTriggerSpeed
+                    if rightPinchTrigger <= pinchTriggerSpeed {
+                        WorldTracker.shared.rightSelectionRayOrigin = simd_float3()
+                        WorldTracker.shared.rightSelectionRayDirection = simd_float3()
+                    }
+                    if rightPinchTrigger < 0.0 {
+                        rightPinchTrigger = 0.0
+                    }
+                    
+                    if steamVRInput2p0Enabled {
+                        rightSkeletonDisableHysteresis = skeletonHysteresisForPinches
+                        skeletonRight = nil
+                    }
+                }
+                
+                if leftPinchTrigger > 0.0 && !systemIsRight {
+                    alvr_send_button(systemButton, boolVal(false))
+                }
+                else if rightPinchTrigger > 0.0 && systemIsRight {
+                    alvr_send_button(systemButton, boolVal(false))
+                }
+            }
+        }
+        lastLeftIsPinching = leftIsPinching
+        lastRightIsPinching = rightIsPinching
+        
+        // Handle this after the pinch gestures can override the skeletons
+        if skeletonLeft != nil {
+            if skeletonLeft!.count >= SteamVRJoints.numberOfJoints.rawValue {
+                skeletonLeftPtr = UnsafeMutablePointer<AlvrPose>.allocate(capacity: 26)
+                for i in 0...25 {
+                    skeletonLeft![i] = filterHandPose(lastSkeletonLeft?[i] ?? skeletonLeft![i], skeletonLeft![i], jointIdxIsMoreMobile(i) ? 2.0 : 1.0)
+                    skeletonLeftPtr![i] = skeletonLeft![i]
+                }
+                
+                trackingMotions.append(AlvrDeviceMotion(device_id: WorldTracker.deviceIdLeftForearm, pose: skeletonLeft![SteamVRJoints.forearmWrist.rawValue], linear_velocity: (0, 0, 0), angular_velocity: (0, 0, 0)))
+                trackingMotions.append(AlvrDeviceMotion(device_id: WorldTracker.deviceIdLeftElbow, pose: skeletonLeft![SteamVRJoints.forearmArm.rawValue], linear_velocity: (0, 0, 0), angular_velocity: (0, 0, 0)))
+            }
+        }
+        if skeletonRight != nil {
+            if skeletonRight!.count >= SteamVRJoints.numberOfJoints.rawValue {
+                skeletonRightPtr = UnsafeMutablePointer<AlvrPose>.allocate(capacity: 26)
+                for i in 0...25 {
+                    skeletonRight![i] = filterHandPose(lastSkeletonRight?[i] ?? skeletonRight![i], skeletonRight![i], jointIdxIsMoreMobile(i) ? 2.0 : 1.0)
+                    skeletonRightPtr![i] = skeletonRight![i]
+                }
+                
+                trackingMotions.append(AlvrDeviceMotion(device_id: WorldTracker.deviceIdRightForearm, pose: skeletonRight![SteamVRJoints.forearmWrist.rawValue], linear_velocity: (0, 0, 0), angular_velocity: (0, 0, 0)))
+                trackingMotions.append(AlvrDeviceMotion(device_id: WorldTracker.deviceIdRightElbow, pose: skeletonRight![SteamVRJoints.forearmArm.rawValue], linear_velocity: (0, 0, 0), angular_velocity: (0, 0, 0)))
+            }
+        }
+        lastSkeletonLeft = skeletonLeft
+        lastSkeletonRight = skeletonRight
+        
+        // MARK: - Calculate the positional/angular velocities for the head
+        var headLinVel: (Float, Float, Float) = (0,0,0)
+        var headAngVel: (Float, Float, Float) = (0,0,0)
+        
+        // TODO: What changed that made this necessary?
+        // Did Apple change their headset transform to not be the average of the view transforms maybe?
+        // OpenXR defines the headset pose as the average of the two view transforms, so we have to do this anyhow.
+        let avgViewTransformXYZ = (EventHandler.shared.viewTransforms[0].columns.3.asFloat3() + EventHandler.shared.viewTransforms[1].columns.3.asFloat3()) * 0.5
+        let headPose = AlvrPose(simd_quaternion(transform), transform.columns.3.asFloat3() + (transform.columns.0.asFloat3() * avgViewTransformXYZ.x) + (transform.columns.1.asFloat3() * avgViewTransformXYZ.y) + (transform.columns.2.asFloat3() * avgViewTransformXYZ.z))
+        lastHeadPose = AlvrPose(simd_quaternion(transformLastRefetched), transformLastRefetched.columns.3.asFloat3() + (transformLastRefetched.columns.0.asFloat3() * avgViewTransformXYZ.x) + (transformLastRefetched.columns.1.asFloat3() * avgViewTransformXYZ.y) + (transformLastRefetched.columns.2.asFloat3() * avgViewTransformXYZ.z))
+        if let p = lastHeadPose {
+            let lastPose = p
+            let pose = headPose
+            let dp = (pose.position.0 - lastPose.position.0, pose.position.1 - lastPose.position.1, pose.position.2 - lastPose.position.2)
+            var dt = Float(targetTimestampWalkedBack - lastHeadTimestamp)
+            if dt <= 0.0 {
+                dt = 0.010 // fallback 10ms
+            }
+            headLinVel = (dp.0 / dt, dp.1 / dt, dp.2 / dt)
+            headAngVel = angularVelocityBetweenQuats(lastPose.orientation, pose.orientation, dt)
+        }
+        lastHeadPose = headPose
+        lastHeadTimestamp = targetTimestampWalkedBack
+        
+        let headMotion = AlvrDeviceMotion(device_id: WorldTracker.deviceIdHead, pose: headPose, linear_velocity: headLinVel, angular_velocity: headAngVel)
+        trackingMotions.append(headMotion)
+        
+        // selection ray tests, replaces left forearm
+#if false
+        var testPoseApple = matrix_identity_float4x4
+        testPoseApple.columns.3 = simd_float4(self.testPosition.x, self.testPosition.y, self.testPosition.z, 1.0)
+        testPoseApple = self.worldTrackingSteamVRTransform.inverse * testPoseApple
+        let testPosApple = testPoseApple.columns.3
+        let testPose = AlvrPose(orientation: AlvrQuat(x: 0.0, y: 0.0, z: 0.0, w: 1.0), position: (testPosApple.x, testPosApple.y, testPosApple.z))
+        trackingMotions.append(AlvrDeviceMotion(device_id: WorldTracker.deviceIdLeftForearm, pose: testPose, linear_velocity: (0, 0, 0), angular_velocity: (0, 0, 0)))
+#endif
+        
+        let viewFovsPtr = UnsafeMutablePointer<AlvrViewParams>.allocate(capacity: 2)
+        viewFovsPtr[0] = AlvrViewParams(pose: leftPoseHeadLocal, fov: viewFovs[0])
+        viewFovsPtr[1] = AlvrViewParams(pose: rightPoseHeadLocal, fov: viewFovs[1])
+
+        //print((CACurrentMediaTime() - lastSentTime) * 1000.0)
+        lastSentTime = CACurrentMediaTime()
+        EventHandler.shared.lastRequestedTimestamp = reportedTargetTimestampNS
+        lastSentHandsTs = lastHandsUpdatedTs
+        
+        if delay == 0.0 {
+            sendGamepadInputs()
+        }
+        
+        // MARK: - Pose debugging, renders XYZ basis gadgets for a bunch of stuff that's sent
+#if DEBUG_ALVR_TRACKING
+        WorldTracker.shared.lockDebuggables()
+        for motion in trackingMotions {
+            if motion.device_id == WorldTracker.deviceIdHead {
+                continue
+            }
+            
+            WorldTracker.shared.addDebuggablePose(convertSteamVRPoseToApple(motion.pose.asFloat4x4()), 0.1)
+        }
+        
+        if let skeletonLeft = skeletonLeft {
+            for pose in skeletonLeft {
+                WorldTracker.shared.addDebuggablePose(convertSteamVRPoseToApple(pose.asFloat4x4()), 0.01)
+            }
+        }
+        
+        if let skeletonRight = skeletonRight {
+            for pose in skeletonRight {
+                WorldTracker.shared.addDebuggablePose(convertSteamVRPoseToApple(pose.asFloat4x4()), 0.01)
+            }
+        }
+        
+        var gazeDepth: Float = 1.0
+        
+        if let eyeGazeLeft = eyeGazeLeftPtr {
+            if let eyeGazeRight = eyeGazeRightPtr {
+                let matL = convertSteamVRPoseToApple(eyeGazeLeft[0].asFloat4x4())
+                let matR = convertSteamVRPoseToApple(eyeGazeRight[0].asFloat4x4())
+                gazeDepth = vergenceDepthTest2(matL, matR)
+                
+                //let leftOrigin = matL.columns.3.asFloat3()
+                //let rightOrigin = matR.columns.3.asFloat3()
+                let verifyAppleOriginFromAnchor = deviceAnchor.originFromAnchorTransform
+                let verifyAppleHeadPosition = verifyAppleOriginFromAnchor.columns.3.asFloat3()
+                let verifyLeftTransform = verifyAppleOriginFromAnchor * viewTransforms[0]
+                let verifyRightTransform = verifyAppleOriginFromAnchor * viewTransforms[1]
+                let leftOrigin = verifyLeftTransform.columns.3.asFloat3()
+                let rightOrigin = verifyRightTransform.columns.3.asFloat3()
+                let combinedOrigin = (leftOrigin+rightOrigin)*0.5
+                
+                var farL = (leftOrigin + (matL.columns.2.asFloat3() * -gazeDepth))
+                var farR = (rightOrigin + (matR.columns.2.asFloat3() * -gazeDepth))
+                var combined = ((farL + farR) * 0.5).asFloat4x4()
+                
+                WorldTracker.shared.addDebuggablePose(combined, 0.01)
+                print("depth", gazeDepth)
+            }
+        }
+        
+        if let eyeGazeLeft = eyeGazeLeftPtr {
+            let matL = convertSteamVRPoseToApple(eyeGazeLeft[0].asFloat4x4())
+            var matLNear = matL
+            var matLFar = matL
+            
+            //let leftOrigin = matL.columns.3.asFloat3()
+            //let rightOrigin = matR.columns.3.asFloat3()
+            let verifyAppleOriginFromAnchor = deviceAnchor.originFromAnchorTransform
+            let verifyAppleHeadPosition = verifyAppleOriginFromAnchor.columns.3.asFloat3()
+            let verifyLeftTransform = verifyAppleOriginFromAnchor * viewTransforms[0]
+            let verifyRightTransform = verifyAppleOriginFromAnchor * viewTransforms[1]
+            let leftOriginApple = verifyLeftTransform.columns.3.asFloat3()
+            let rightOriginApple = verifyRightTransform.columns.3.asFloat3()
+            let combinedOriginApple = (leftOriginApple+rightOriginApple)*0.5
+            //matLFar.columns.3 = combinedOriginApple.asFloat4_1()
+            //matLNear.columns.3 = combinedOriginApple.asFloat4_1()
+            
+            matLNear.columns.3 -= (matL.columns.2.asFloat3() * 1.2).asFloat4()
+            matLFar.columns.3 -= (matL.columns.2.asFloat3() * gazeDepth).asFloat4()
+            
+            WorldTracker.shared.addDebuggablePose(matLNear, 0.005)
+            //WorldTracker.shared.addDebuggablePose(matLFar, 0.005)
+            
+        }
+        
+        if let eyeGazeRight = eyeGazeRightPtr {
+            let matR = convertSteamVRPoseToApple(eyeGazeRight[0].asFloat4x4())
+            var matRNear = matR
+            var matRFar = matR
+            
+            //let leftOrigin = matL.columns.3.asFloat3()
+            //let rightOrigin = matR.columns.3.asFloat3()
+            let verifyAppleOriginFromAnchor = deviceAnchor.originFromAnchorTransform
+            let verifyAppleHeadPosition = verifyAppleOriginFromAnchor.columns.3.asFloat3()
+            let verifyLeftTransform = verifyAppleOriginFromAnchor * viewTransforms[0]
+            let verifyRightTransform = verifyAppleOriginFromAnchor * viewTransforms[1]
+            let leftOriginApple = verifyLeftTransform.columns.3.asFloat3()
+            let rightOriginApple = verifyRightTransform.columns.3.asFloat3()
+            let combinedOriginApple = (leftOriginApple+rightOriginApple)*0.5
+            //matRFar.columns.3 = combinedOriginApple.asFloat4_1()
+            //matRNear.columns.3 = combinedOriginApple.asFloat4_1()
+            
+            matRNear.columns.3 -= (matR.columns.2.asFloat3() * 1.2).asFloat4()
+            matRFar.columns.3 -= (matR.columns.2.asFloat3() * gazeDepth).asFloat4()
+            WorldTracker.shared.addDebuggablePose(matRNear, 0.005)
+            //WorldTracker.shared.addDebuggablePose(matRFar, 0.01)
+        }
+        
+        WorldTracker.shared.addDebuggablePose((appleOriginFromAnchor.columns.3.asFloat3() - appleOriginFromAnchor.columns.2.asFloat3()).asFloat4x4(), 0.005)
+        WorldTracker.shared.unlockDebuggables()
+#endif
+
+        // Send face tracking
+        if self.fbFaceTrackingValid {
+            for i in 0..<70 {
+                fbFaceExpressions?[i] = self.fbFaceTracking[i]
+            }
+        }
+
+        EventHandler.shared.outgoingWorker.enqueue {
+            // Old API, currently in master/v20
+            //alvr_send_tracking(reportedTargetTimestampNS, trackingMotions, UInt64(trackingMotions.count), [UnsafePointer(skeletonLeftPtr), UnsafePointer(skeletonRightPtr)], [UnsafePointer(eyeGazeLeftPtr), UnsafePointer(eyeGazeRightPtr)])
+            
+            // New API, not upstreamed
+            alvr_send_tracking_and_face_data(reportedTargetTimestampNS, trackingMotions, UInt64(trackingMotions.count), [UnsafePointer(skeletonLeftPtr), UnsafePointer(skeletonRightPtr)], [UnsafePointer(eyeGazeLeftPtr), UnsafePointer(eyeGazeRightPtr)], UnsafePointer(fbFaceExpressions))
+
+            if self.needsRecenterTrigger {
+                // TODO raycast to the nearest wall/TV
+                alvr_send_playspace(2.0, 2.0)
+                self.needsRecenterTrigger = false
+            }
+
+            viewFovsPtr.deallocate()
+            eyeGazeLeftPtr?.deallocate()
+            eyeGazeRightPtr?.deallocate()
+            skeletonLeftPtr?.deallocate()
+            skeletonRightPtr?.deallocate()
+            fbFaceExpressions?.deallocate()
+        }
+        
+        return appleOriginFromAnchor
+    }
+    
+    func sendViewParams(viewTransforms: [simd_float4x4], viewFovs: [AlvrFov]) {
+        let leftTransformHeadLocal = viewTransforms[0]
+        let rightTransformHeadLocal = viewTransforms[1]
+        
+        let leftOrientationHeadLocal = simd_quaternion(leftTransformHeadLocal)
+        let leftPositionHeadLocal = leftTransformHeadLocal.columns.3
+        let leftPoseHeadLocal = AlvrPose(leftOrientationHeadLocal, leftPositionHeadLocal)
+        let rightOrientationHeadLocal = simd_quaternion(rightTransformHeadLocal)
+        let rightPositionHeadLocal = rightTransformHeadLocal.columns.3
+        let rightPoseHeadLocal = AlvrPose(rightOrientationHeadLocal, rightPositionHeadLocal)
+        
+        let viewFovsPtr = UnsafeMutablePointer<AlvrViewParams>.allocate(capacity: 2)
+        viewFovsPtr[0] = AlvrViewParams(pose: leftPoseHeadLocal, fov: viewFovs[0])
+        viewFovsPtr[1] = AlvrViewParams(pose: rightPoseHeadLocal, fov: viewFovs[1])
+        
+        alvr_send_view_params(UnsafePointer(viewFovsPtr))
+    }
+    
+    // We want video frames ASAP, so we send a fake view pose/FOVs to keep the frames coming
+    // until we have access to real values
+    func sendFakeTracking(viewFovs: [AlvrFov], targetTimestamp: Double) {
+        // Shouldn't happen
+        if viewFovs.isEmpty {
+            return
+        }
+        
+        var trackingMotions:[AlvrDeviceMotion] = []
+        
+        let dummyPoseView = AlvrPose()
+        let dummyPoseHeadset = AlvrPose(orientation: AlvrQuat(simd_quatf(ix: 0, iy: 0, iz: 0, r: 1)), position: (0.0, 1.2, 0.0)) // keep the dummy at a reasonable height for both seated/standing entry
+        let targetTimestampNS = UInt64(targetTimestamp * Double(NSEC_PER_SEC))
+        
+        let viewFovsPtr = UnsafeMutablePointer<AlvrViewParams>.allocate(capacity: 2)
+        defer { viewFovsPtr.deallocate() }
+        viewFovsPtr[0] = AlvrViewParams(pose: dummyPoseView, fov: viewFovs[0])
+        viewFovsPtr[1] = AlvrViewParams(pose: dummyPoseView, fov: viewFovs[1])
+        
+        let headLinVel: (Float, Float, Float) = (0,0,0)
+        let headAngVel: (Float, Float, Float) = (0,0,0)
+        let headMotion = AlvrDeviceMotion(device_id: WorldTracker.deviceIdHead, pose: dummyPoseHeadset, linear_velocity: headLinVel, angular_velocity: headAngVel)
+        trackingMotions.append(headMotion)
+        
+        alvr_send_view_params(UnsafePointer(viewFovsPtr))
+        alvr_send_tracking(targetTimestampNS, trackingMotions, UInt64(trackingMotions.count), nil, nil)
+        
+        print("Sending fake tracking...")
+    }
+    
+    func angularVelocityBetweenQuats(_ q1: AlvrQuat, _ q2: AlvrQuat, _ dt: Float) -> (Float, Float, Float) {
+        let r = (2.0 / dt)
+        return (
+            (q1.w*q2.x - q1.x*q2.w - q1.y*q2.z + q1.z*q2.y) * r,
+            (q1.w*q2.y + q1.x*q2.z - q1.y*q2.w - q1.z*q2.x) * r,
+            (q1.w*q2.z - q1.x*q2.y + q1.y*q2.x - q1.z*q2.w) * r
+            )
+    }
+    
+    // The poses we get back from the ALVR runtime are in SteamVR coordinate space,
+    // so we need to convert them back to local space
+    func convertSteamVRViewPose(_ viewParams: [AlvrViewParams]) -> simd_float4x4 {
+        // Shouldn't happen, somehow happened with the Metal renderer?
+        if viewParams.isEmpty {
+            return matrix_identity_float4x4
+        }
+
+        let o = viewParams[0].pose.orientation
+        let p = viewParams[0].pose.position
+        var leftTransform = simd_float4x4(simd_quatf(ix: o.x, iy: o.y, iz: o.z, r: o.w))
+        leftTransform.columns.3 = simd_float4(p.0, p.1, p.2, 1.0)
+        leftTransform.columns.3 -= floorCorrectionTransform.asFloat4()
+        
+        leftTransform = leftTransform * EventHandler.shared.viewTransforms[0].inverse
+        leftTransform = worldTrackingSteamVRTransform * leftTransform
+        
+        return leftTransform
+    }
+    
+    func convertApplePositionToSteamVR(_ _p: simd_float3) -> simd_float3 {
+        let p = _p.asSanitized()
+
+        var t = matrix_identity_float4x4
+        t.columns.3 = simd_float4(p.x, p.y, p.z, 1.0)
+        t = self.worldTrackingSteamVRTransform.inverse * t
+        t.columns.3 += floorCorrectionTransform.asFloat4()
+        return simd_float3(t.columns.3.x, t.columns.3.y, t.columns.3.z)
+    }
+    
+    func convertSteamVRPoseToApple(_ _m: simd_float4x4) -> simd_float4x4 {
+        var mat = _m.asSanitized()
+        mat.columns.3 -= floorCorrectionTransform.asFloat4()
+        mat = worldTrackingSteamVRTransform * mat
+        return mat
+    }
+    
+    func vergenceDepthTest(_ leftMat: simd_float4x4, _ rightMat: simd_float4x4) -> Float {
+        let l_forward = -leftMat.columns.2.asFloat3()
+        let r_forward = -rightMat.columns.2.asFloat3()
+
+        let p1 = leftMat.columns.3.asFloat3() // position
+        let d1 = l_forward // forward
+        let p2 = rightMat.columns.3.asFloat3()
+        let d2 = r_forward
+        let p_avg = (p1 + p2) / 2.0
+
+        let p1_p2 = p2 - p1
+        let d1_dot_d1 = simd_dot(d1, d1)
+        let d2_dot_d2 = simd_dot(d2, d2)
+        let d1_dot_d2 = simd_dot(d1, d2)
+        let p1_p2_dot_d1 = simd_dot(p1_p2, d1)
+        let p1_p2_dot_d2 = simd_dot(p1_p2, d2)
+
+        let denom = d1_dot_d1 * d2_dot_d2 - d1_dot_d2 * d1_dot_d2;
+        if abs(denom) < 1e-6 {
+            //return None; // Rays are nearly parallel
+            //alvr_common::info!("Eyes are parallel l: {p1} {d1} r: {p2} {d2}");
+            
+            return 10.0
+        } else {
+            let s = (p1_p2_dot_d1 * d2_dot_d2 - p1_p2_dot_d2 * d1_dot_d2) / denom
+            let t = (p1_p2_dot_d1 * d1_dot_d2 - p1_p2_dot_d2 * d1_dot_d1) / denom
+
+            let closest_p1 = p1 + s * d1
+            let closest_p2 = p2 + t * d2
+
+            let closest_p1_dist_from_eyes = simd_distance(p_avg, closest_p1)
+            let closest_p2_dist_from_eyes = simd_distance(p_avg, closest_p2)
+
+            var depth = abs((closest_p1_dist_from_eyes + closest_p2_dist_from_eyes) / 2.0) // Approximate depth
+            if depth > 10.0 {
+                depth = 10.0
+            }
+            
+            return depth
+        }
+    }
+    
+    // Returns the vergence angle (in radians) between two view matrices.
+    /// Assumes -Z axis is the forward direction.
+    func vergenceAngle(_ left: simd_float4x4, _ right: simd_float4x4) -> Float {
+        // Extract forward (-Z) for each matrix.
+        // In a column-major right-handed transform:
+        //   Forward = -third column (index 2)
+        let fL = normalize(-left.columns.2.asFloat3())
+        let fR = normalize(-right.columns.2.asFloat3())
+
+        // Clamp dot to avoid NaN from floating point drift
+        let dotVal = max(-1.0, min(1.0, dot(fL, fR)))
+
+        // Angle between the two forward vectors
+        return acos(dotVal)
+    }
+    
+    /// Returns the vergence angle (in radians) between two view matrices,
+    /// using only the horizontal (XZ-plane) components of the forward rays.
+    /// Assumes -Z is forward.
+    func vergenceAngleHorizontal(_ left: simd_float4x4, _ right: simd_float4x4) -> Float {
+        // Extract forward (-Z direction)
+        let fL = -left.columns.2.asFloat3()
+        let fR = -right.columns.2.asFloat3()
+
+        // Zero out Y so only horizontal direction matters
+        var hL = simd_float3(fL.x, 0, fL.z)
+        var hR = simd_float3(fR.x, 0, fR.z)
+
+        // Normalize safely
+        hL = normalize(hL)
+        hR = normalize(hR)
+
+        let dotVal = max(-1.0, min(1.0, dot(hL, hR)))
+        return acos(dotVal)
+    }
+    
+    func vergenceDepthTest2(_ leftMat: simd_float4x4, _ rightMat: simd_float4x4) -> Float {
+        let angle = vergenceAngle(leftMat, rightMat)
+        let ipd = simd_distance(leftMat.columns.3.asFloat3(), rightMat.columns.3.asFloat3())
+        //let val = pow(ipd / tan(angle * 0.5), 2) * 4.0 // Correct
+        let val = ((ipd * 0.5) / tan(angle * 0.5)) * 4.0 // Not correct but worked on PFD
+        //let val = vergenceDepthTest(leftMat, rightMat) * 4.0
+        return (val > 100.0) ? 0.25 : val
+    }
+}
