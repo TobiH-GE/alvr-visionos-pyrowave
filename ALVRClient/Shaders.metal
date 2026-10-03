@@ -118,6 +118,8 @@ constant float2 VRR_PHYS_SIZE [[ function_constant(ALVRFunctionConstantVRRPhysSi
 constant float ENCODING_GAMMA [[ function_constant(ALVRFunctionConstantEncodingGamma) ]];
 constant float4 ENCODING_YUV_TRANSFORM_0 [[ function_constant(ALVRFunctionConstantEncodingYUVTransform0) ]];
 constant float4 ENCODING_YUV_TRANSFORM_1 [[ function_constant(ALVRFunctionConstantEncodingYUVTransform1) ]];
+constant int VIDEO_FILTER [[ function_constant(ALVRFunctionConstantVideoFilter) ]]; // 0 bilinear, 1 bicubic, 2 FSR
+constant float VIDEO_SHARPEN [[ function_constant(ALVRFunctionConstantVideoSharpen) ]];
 constant float4 ENCODING_YUV_TRANSFORM_2 [[ function_constant(ALVRFunctionConstantEncodingYUVTransform2) ]];
 constant float4 ENCODING_YUV_TRANSFORM_3 [[ function_constant(ALVRFunctionConstantEncodingYUVTransform3) ]];
 
@@ -332,6 +334,174 @@ half4 videoFrameFragmentShader_common(half3 color_in) {
     //color = linearToDisplayP3 * color;
 }
 
+// Catmull-Rom bicubic sampling from nine bilinear reads (the separable weights of the outer
+// taps fold into the linear filter). Sharper than bilinear; the negative lobes can overshoot
+// slightly, so the result is clamped to the texture's range.
+static half4 sampleCatmullRom(texture2d<half> tex, sampler s, float2 uv) {
+    float2 texSize = float2(tex.get_width(), tex.get_height());
+    float2 samplePos = uv * texSize;
+    float2 texPos1 = floor(samplePos - 0.5f) + 0.5f;
+    float2 f = samplePos - texPos1;
+
+    float2 w0 = f * (-0.5f + f * (1.0f - 0.5f * f));
+    float2 w1 = 1.0f + f * f * (-2.5f + 1.5f * f);
+    float2 w2 = f * (0.5f + f * (2.0f - 1.5f * f));
+    float2 w3 = f * f * (-0.5f + 0.5f * f);
+
+    float2 w12 = w1 + w2;
+    float2 offset12 = w2 / w12;
+
+    float2 texPos0 = (texPos1 - 1.0f) / texSize;
+    float2 texPos3 = (texPos1 + 2.0f) / texSize;
+    float2 texPos12 = (texPos1 + offset12) / texSize;
+
+    float4 result = 0.0f;
+    result += float4(tex.sample(s, float2(texPos0.x, texPos0.y))) * w0.x * w0.y;
+    result += float4(tex.sample(s, float2(texPos12.x, texPos0.y))) * w12.x * w0.y;
+    result += float4(tex.sample(s, float2(texPos3.x, texPos0.y))) * w3.x * w0.y;
+    result += float4(tex.sample(s, float2(texPos0.x, texPos12.y))) * w0.x * w12.y;
+    result += float4(tex.sample(s, float2(texPos12.x, texPos12.y))) * w12.x * w12.y;
+    result += float4(tex.sample(s, float2(texPos3.x, texPos12.y))) * w3.x * w12.y;
+    result += float4(tex.sample(s, float2(texPos0.x, texPos3.y))) * w0.x * w3.y;
+    result += float4(tex.sample(s, float2(texPos12.x, texPos3.y))) * w12.x * w3.y;
+    result += float4(tex.sample(s, float2(texPos3.x, texPos3.y))) * w3.x * w3.y;
+    return half4(clamp(result, 0.0f, 1.0f));
+}
+
+static half4 sampleVideo(texture2d<half> tex, sampler s, float2 uv) {
+    return VIDEO_FILTER >= 1 ? sampleCatmullRom(tex, s, uv) : tex.sample(s, uv);
+}
+
+// One texel of the red channel, clamped to the texture like address::clamp_to_edge.
+static float easuTexel(texture2d<half> tex, float2 p, float2 maxPos) {
+    return float(tex.read(uint2(clamp(p, 0.0f, maxPos))).r);
+}
+
+// Direction and edge length from one texel's cross of neighbours (FsrEasuSetF): a is above, b left,
+// c the texel itself, d right, e below. w is the texel's bilinear weight at the sample point.
+static void easuSet(thread float2 &dir, thread float &len, float w,
+                    float a, float b, float c, float d, float e) {
+    float dc = d - c;
+    float cb = c - b;
+    float lenX = max(abs(dc), abs(cb));
+    lenX = lenX > 0.0f ? 1.0f / lenX : 0.0f;
+    float dirX = d - b;
+    dir.x += dirX * w;
+    lenX = saturate(abs(dirX) * lenX);
+    len += lenX * lenX * w;
+
+    float ec = e - c;
+    float ca = c - a;
+    float lenY = max(abs(ec), abs(ca));
+    lenY = lenY > 0.0f ? 1.0f / lenY : 0.0f;
+    float dirY = e - a;
+    dir.y += dirY * w;
+    lenY = saturate(abs(dirY) * lenY);
+    len += lenY * lenY * w;
+}
+
+// One tap of the EASU kernel (FsrEasuTapF): a Lanczos-2 approximation stretched along the edge
+// direction and squeezed across it.
+static void easuTap(thread float &aC, thread float &aW, float2 off, float2 dir, float2 len2,
+                    float lob, float clp, float c) {
+    float2 v = float2(off.x * dir.x + off.y * dir.y, -off.x * dir.y + off.y * dir.x) * len2;
+    float d2 = min(dot(v, v), clp);
+    float wB = 2.0f / 5.0f * d2 - 1.0f;
+    float wA = lob * d2 - 1.0f;
+    wB *= wB;
+    wA *= wA;
+    wB = 25.0f / 16.0f * wB - (25.0f / 16.0f - 1.0f);
+    float w = wA * wB;
+    aC += c * w;
+    aW += w;
+}
+
+// AMD FidelityFX Super Resolution 1 edge adaptive spatial upsampling (EASU) of one channel, the
+// luma. Twelve texels around the sample point, in the layout
+//       b c
+//     e f g h
+//     i j k l
+//       n o
+// give a local edge direction and length; the kernel then follows the edge, so diagonal and curved
+// edges stay smooth where bilinear and bicubic filters staircase. The result is clamped to the four
+// nearest texels, which keeps the negative lobes from ringing. Reads texels directly rather than
+// through the sampler, as the original does with gathers.
+static half easuLuma(texture2d<half> tex, float2 uv) {
+    float2 texSize = float2(tex.get_width(), tex.get_height());
+    float2 maxPos = texSize - 1.0f;
+    float2 pp = uv * texSize - 0.5f;
+    float2 fp = floor(pp);
+    pp -= fp;
+
+    float b = easuTexel(tex, fp + float2(0.0f, -1.0f), maxPos);
+    float c = easuTexel(tex, fp + float2(1.0f, -1.0f), maxPos);
+    float e = easuTexel(tex, fp + float2(-1.0f, 0.0f), maxPos);
+    float f = easuTexel(tex, fp, maxPos);
+    float g = easuTexel(tex, fp + float2(1.0f, 0.0f), maxPos);
+    float h = easuTexel(tex, fp + float2(2.0f, 0.0f), maxPos);
+    float i = easuTexel(tex, fp + float2(-1.0f, 1.0f), maxPos);
+    float j = easuTexel(tex, fp + float2(0.0f, 1.0f), maxPos);
+    float k = easuTexel(tex, fp + float2(1.0f, 1.0f), maxPos);
+    float l = easuTexel(tex, fp + float2(2.0f, 1.0f), maxPos);
+    float n = easuTexel(tex, fp + float2(0.0f, 2.0f), maxPos);
+    float o = easuTexel(tex, fp + float2(1.0f, 2.0f), maxPos);
+
+    float2 dir = 0.0f;
+    float len = 0.0f;
+    easuSet(dir, len, (1.0f - pp.x) * (1.0f - pp.y), b, e, f, g, j);
+    easuSet(dir, len, pp.x * (1.0f - pp.y), c, f, g, h, k);
+    easuSet(dir, len, (1.0f - pp.x) * pp.y, f, i, j, k, n);
+    easuSet(dir, len, pp.x * pp.y, g, j, k, l, o);
+
+    float dirR = dir.x * dir.x + dir.y * dir.y;
+    bool zero = dirR < 1.0f / 32768.0f;
+    dirR = zero ? 1.0f : dirR;
+    dir.x = zero ? 1.0f : dir.x;
+    dir *= rsqrt(dirR);
+    len = len * 0.5f;
+    len *= len;
+    float stretch = (dir.x * dir.x + dir.y * dir.y) / max(abs(dir.x), abs(dir.y));
+    float2 len2 = float2(1.0f + (stretch - 1.0f) * len, 1.0f - 0.5f * len);
+    float lob = 0.5f + ((1.0f / 4.0f - 0.04f) - 0.5f) * len;
+    float clp = 1.0f / lob;
+
+    float aC = 0.0f;
+    float aW = 0.0f;
+    easuTap(aC, aW, float2(0.0f, -1.0f) - pp, dir, len2, lob, clp, b);
+    easuTap(aC, aW, float2(1.0f, -1.0f) - pp, dir, len2, lob, clp, c);
+    easuTap(aC, aW, float2(-1.0f, 1.0f) - pp, dir, len2, lob, clp, i);
+    easuTap(aC, aW, float2(0.0f, 1.0f) - pp, dir, len2, lob, clp, j);
+    easuTap(aC, aW, float2(0.0f, 0.0f) - pp, dir, len2, lob, clp, f);
+    easuTap(aC, aW, float2(-1.0f, 0.0f) - pp, dir, len2, lob, clp, e);
+    easuTap(aC, aW, float2(1.0f, 1.0f) - pp, dir, len2, lob, clp, k);
+    easuTap(aC, aW, float2(2.0f, 1.0f) - pp, dir, len2, lob, clp, l);
+    easuTap(aC, aW, float2(2.0f, 0.0f) - pp, dir, len2, lob, clp, h);
+    easuTap(aC, aW, float2(1.0f, 0.0f) - pp, dir, len2, lob, clp, g);
+    easuTap(aC, aW, float2(1.0f, 2.0f) - pp, dir, len2, lob, clp, o);
+    easuTap(aC, aW, float2(0.0f, 2.0f) - pp, dir, len2, lob, clp, n);
+
+    float mn = min(min(f, g), min(j, k));
+    float mx = max(max(f, g), max(j, k));
+    return half(clamp(aC / aW, mn, mx));
+}
+
+// Contrast adaptive sharpening (after AMD FidelityFX CAS) of one channel: the center value
+// against its four neighbours one texel away in the video texture. The sharpening weight shrinks
+// where the neighbourhood already has high contrast, so edges do not ring and flat areas are
+// left alone. strength 0...1 goes from CAS's weakest (-1/8) to its strongest (-1/5) lobe.
+static half sharpenChannel(texture2d<half> tex, sampler s, float2 uv, half center, float strength) {
+    float2 t = 1.0f / float2(tex.get_width(), tex.get_height());
+    half n = tex.sample(s, uv + float2(0.0f, -t.y)).r;
+    half so = tex.sample(s, uv + float2(0.0f, t.y)).r;
+    half e = tex.sample(s, uv + float2(t.x, 0.0f)).r;
+    half w = tex.sample(s, uv + float2(-t.x, 0.0f)).r;
+    half mn = min(center, min(min(n, so), min(e, w)));
+    half mx = max(center, max(max(n, so), max(e, w)));
+    half amp = sqrt(saturate(min(mn, 1.0h - mx) / max(mx, 0.001h)));
+    half weight = amp * (-1.0h / mix(8.0h, 5.0h, half(saturate(strength))));
+    return saturate((center + (n + so + e + w) * weight) / (1.0h + 4.0h * weight));
+}
+
 fragment half4 videoFrameFragmentShader_YpCbCrBiPlanar(ColorInOut in [[stage_in]], texture2d<half> in_tex_y, texture2d<half> in_tex_uv) {
     
     float2 sampleCoord;
@@ -343,9 +513,17 @@ fragment half4 videoFrameFragmentShader_YpCbCrBiPlanar(ColorInOut in [[stage_in]
     
     constexpr sampler colorSampler(mip_filter::none,
                                    mag_filter::linear,
-                                   min_filter::linear);
-    half4 ySample = in_tex_y.sample(colorSampler, sampleCoord);
-    half4 uvSample = in_tex_uv.sample(colorSampler, sampleCoord);
+                                   min_filter::linear,
+                                   address::clamp_to_edge);
+    // FSR: EASU on luma, where the detail is; chroma is stored at half resolution and gets the
+    // bicubic filter.
+    half4 ySample = VIDEO_FILTER == 2 ? half4(easuLuma(in_tex_y, sampleCoord))
+                                      : sampleVideo(in_tex_y, colorSampler, sampleCoord);
+    half4 uvSample = sampleVideo(in_tex_uv, colorSampler, sampleCoord);
+    if (VIDEO_SHARPEN > 0.0f) {
+        // Luma only: sharpening chroma adds color fringes and little perceived detail.
+        ySample.r = sharpenChannel(in_tex_y, colorSampler, sampleCoord, ySample.r, VIDEO_SHARPEN);
+    }
     half4 ycbcr = half4(ySample.r, uvSample.rg, 1.0f);
     
     const matrix_half4x4 transform = matrix_half4x4(
@@ -372,9 +550,12 @@ fragment half4 videoFrameFragmentShader_SecretYpCbCrFormats(ColorInOut in [[stag
     
     constexpr sampler colorSampler(mip_filter::none,
                                    mag_filter::linear,
-                                   min_filter::linear);
+                                   min_filter::linear,
+                                   address::clamp_to_edge);
     
-    half3 color = in_tex_y.sample(colorSampler, sampleCoord).rgb;
+    // Apple's private formats sample as RGB, so sharpening would need a luma of its own; only the
+    // bicubic filter applies here, and the FSR setting falls back to it.
+    half3 color = sampleVideo(in_tex_y, colorSampler, sampleCoord).rgb;
     
     return videoFrameFragmentShader_common(color);
 }

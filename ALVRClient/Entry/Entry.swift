@@ -374,6 +374,56 @@ struct Entry: View {
                             saveAction()
                         }
 
+                        Toggle(isOn: $gStore.settings.maxRenderQuality) {
+                            Text("Max Render Quality")
+                            Text("Renders at visionOS's maximum render quality (6262x5020 per eye instead of 4338x3478), so a sharper stream center is shown as sent. Match the streamer's resolution (e.g. 6240x4992) to use it. Costs GPU time on the headset. Metal renderer, visionOS 26; takes effect the next time the stream opens.")
+                                .font(.system(size: 10))
+                        }
+                        .toggleStyle(.switch)
+                        .onChange(of: gStore.settings.maxRenderQuality) {
+                            saveAction()
+                        }
+
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text("Video Filter")
+                                Text("How the video is scaled onto the display. Bicubic keeps edges crisper than bilinear; FSR (AMD FidelityFX Super Resolution 1) follows edge directions and suits the ~1.5x upscale of the stream center best. Slightly more GPU work on the headset. Metal renderer; applies within a second while streaming.")
+                                    .font(.system(size: 10))
+                            }
+                            Picker("Video Filter", selection: $gStore.settings.videoFilter) {
+                                ForEach(["Bilinear", "Bicubic", "FSR"], id: \.self) {
+                                    Text($0)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .onChange(of: gStore.settings.videoFilter) {
+                                saveAction()
+                            }
+                        }
+
+                        Toggle(isOn: $gStore.settings.sharpenEnabled) {
+                            Text("Sharpen")
+                            Text("Contrast adaptive sharpening of the video, to offset the softening at low bits per pixel. Too strong amplifies compression noise and can shimmer with head motion. Metal renderer; applies within a second while streaming.")
+                                .font(.system(size: 10))
+                        }
+                        .toggleStyle(.switch)
+                        .onChange(of: gStore.settings.sharpenEnabled) {
+                            saveAction()
+                        }
+                        if gStore.settings.sharpenEnabled {
+                            HStack {
+                                Text("Strength")
+                                Slider(value: $gStore.settings.sharpenStrength, in: 0...1, step: 0.05) {
+                                    Text("Sharpen Strength")
+                                }
+                                .onChange(of: gStore.settings.sharpenStrength) {
+                                    saveAction()
+                                }
+                                Text(String(format: "%.2f", gStore.settings.sharpenStrength))
+                                    .frame(width: 50)
+                            }
+                        }
+
                         Button {
                             openWindow(id: "InputDebug")
                         } label: {

@@ -86,4 +86,6 @@ typedef NS_ENUM(EnumBackingType, ALVRFunctionConstant)
     ALVRFunctionConstantEncodingYUVTransform1 = 305,
     ALVRFunctionConstantEncodingYUVTransform2 = 306,
     ALVRFunctionConstantEncodingYUVTransform3 = 307,
+    ALVRFunctionConstantVideoFilter = 400,
+    ALVRFunctionConstantVideoSharpen = 401,
 };

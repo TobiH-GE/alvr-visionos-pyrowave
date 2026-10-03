@@ -169,6 +169,11 @@ class Renderer {
     // Chroma keying shader vars
     //
     var chromaKeyEnabled = false
+    // Video resampling filters as the current pipelines were built (GlobalSettings.videoFilter:
+    // 0 bilinear, 1 bicubic, 2 FSR;
+    // sharpenEnabled/sharpenStrength; 0 = no sharpening).
+    var videoFilter: Int32 = 0
+    var videoSharpen: Float = 0.0
     var chromaKeyColor = simd_float3(0.0, 1.0, 0.0); // green
     
     //chromaKeyLerpDistRange is used to decide the amount of color to be used from either foreground or background
@@ -186,7 +191,11 @@ class Renderer {
         else {
 #if XCODE_BETA_26
             if #available(visionOS 26.0, *) {
-                //self.layerRenderer?.renderQuality = .init(1.0)
+                // maxRenderQuality is 1.0 (ALVRClientApp), so any value up to 1.0 is allowed.
+                if ALVRClientApp.gStore.settings.maxRenderQuality {
+                    self.layerRenderer?.renderQuality = .init(1.0)
+                    pyroLog("Render quality: 1.0 (Max Render Quality)")
+                }
             }
 #endif
         }
@@ -334,6 +343,11 @@ class Renderer {
                             foveationVars: foveationVars,
                             variantName: "SecretYpCbCrFormats"
         )
+        // What actually went into the shaders' function constants, so a log says which filter ran.
+        let filterNames = ["Bilinear", "Bicubic", "FSR"]
+        let filterName = filterNames.indices.contains(Int(videoFilter)) ? filterNames[Int(videoFilter)] : "unknown"
+        pyroLog("Video pipelines built: filter \(filterName) (constant \(videoFilter), setting \"\(ALVRClientApp.gStore.settings.videoFilter)\"), sharpen "
+            + (videoSharpen > 0 ? String(format: "%.2f", videoSharpen) : "off"))
         
         do {
             pipelineState = try Renderer.buildRenderPipelineWithDevice(device: device,
@@ -515,6 +529,18 @@ class Renderer {
         return try device.makeRenderPipelineState(descriptor: pipelineDescriptor)
     }
     
+    static func videoFilterIndex(_ settings: GlobalSettings) -> Int32 {
+        switch settings.videoFilter {
+        case "Bicubic": return 1
+        case "FSR": return 2
+        default: return 0
+        }
+    }
+
+    static func effectiveSharpen(_ settings: GlobalSettings) -> Float {
+        settings.sharpenEnabled ? max(settings.sharpenStrength, 0.0) : 0.0
+    }
+
     // Video frame renderer, incl my own YCbCr stage and/or Apple's 48 private YCbCr texture formats.
     func buildRenderPipelineForVideoFrameWithDevice(device: MTLDevice,
                                                           mtlVertexDescriptor: MTLVertexDescriptor,
@@ -548,6 +574,10 @@ class Renderer {
         fragmentConstants.setConstantValue(&currentYuvTransform.columns.1, type: .float4, index: ALVRFunctionConstant.encodingYUVTransform1.rawValue)
         fragmentConstants.setConstantValue(&currentYuvTransform.columns.2, type: .float4, index: ALVRFunctionConstant.encodingYUVTransform2.rawValue)
         fragmentConstants.setConstantValue(&currentYuvTransform.columns.3, type: .float4, index: ALVRFunctionConstant.encodingYUVTransform3.rawValue)
+        videoFilter = Renderer.videoFilterIndex(settings)
+        videoSharpen = Renderer.effectiveSharpen(settings)
+        fragmentConstants.setConstantValue(&videoFilter, type: .int, index: ALVRFunctionConstant.videoFilter.rawValue)
+        fragmentConstants.setConstantValue(&videoSharpen, type: .float, index: ALVRFunctionConstant.videoSharpen.rawValue)
         
         let fragmentFunction = try library?.makeFunction(name: "videoFrameFragmentShader_" + variantName, constantValues: fragmentConstants)
 
@@ -818,6 +848,8 @@ class Renderer {
         var drawables: [LayerRenderer.Drawable] = [_drawable]
 #endif
         
+        RateMapDiag.shared.observe(drawable: mainDrawable)
+
         let nalViewsPtr = UnsafeMutablePointer<AlvrViewParams>.allocate(capacity: 2)
         defer { nalViewsPtr.deallocate() }
         
@@ -887,7 +919,7 @@ class Renderer {
                 needsPipelineRebuild = true
             }
             
-            if CACurrentMediaTime() - lastReconfigureTime > 1.0 && (settings.chromaKeyEnabled != chromaKeyEnabled || settings.chromaKeyColorR != chromaKeyColor.x || settings.chromaKeyColorG != chromaKeyColor.y || settings.chromaKeyColorB != chromaKeyColor.z || settings.chromaKeyDistRangeMin != chromaKeyLerpDistRange.x || settings.chromaKeyDistRangeMax != chromaKeyLerpDistRange.y) {
+            if CACurrentMediaTime() - lastReconfigureTime > 1.0 && (settings.chromaKeyEnabled != chromaKeyEnabled || settings.chromaKeyColorR != chromaKeyColor.x || settings.chromaKeyColorG != chromaKeyColor.y || settings.chromaKeyColorB != chromaKeyColor.z || settings.chromaKeyDistRangeMin != chromaKeyLerpDistRange.x || settings.chromaKeyDistRangeMax != chromaKeyLerpDistRange.y || Renderer.videoFilterIndex(settings) != videoFilter || Renderer.effectiveSharpen(settings) != videoSharpen) {
                 lastReconfigureTime = CACurrentMediaTime()
                 needsPipelineRebuild = true
             }
@@ -2182,7 +2214,9 @@ final class TrackingSendPhase {
         }
         let optimal = Self.seconds(timing.optimalInputTime)
         let interval = optimal - lastOptimal
-        if lastOptimal > 0 && interval > 0.006 && interval < 0.02 {
+        // Up to 50 ms: visionOS can hand the app only every second display frame (22.22 ms at
+        // 90 Hz); the period must follow so the plan holds instead of steering on the wrong cycle.
+        if lastOptimal > 0 && interval > 0.006 && interval < 0.05 {
             period += (interval - period) * 0.05
         }
         lastOptimal = optimal
@@ -2339,25 +2373,31 @@ final class TrackingSendPhase {
 }
 
 
-// Display rate watch (2026-09-27). In every PyroWave run so far visionOS ran the display at 100 Hz
-// under the 90 fps stream (frame timing: deadline-optimal 10.00 ms), often only after a while: then
-// every tenth display frame has no new video frame, and frames drift through the display cycle, so
-// neither pickup phase control can work. The rate preference (AVDisplayCriteria) lives on a window,
-// and with "Dismiss Window on Enter" that window is gone while streaming. This notices when the
-// display period stops matching the preference, logs it, and asks again (at most every 10 s).
+// Frame rate watch. Two things change how often visionOS hands this app a frame, and both look
+// the same on the streamer (fewer tracking samples, fewer frames shown):
+//  - the display rate: visionOS runs the display at 100 Hz when the passthrough cameras detect
+//    50 Hz flicker from artificial light ("Passthrough_50Hz_Flicker_Detected"), whatever the app
+//    asks for. Under a 90 fps stream frames then drift through the display cycle, so neither
+//    pickup phase control can work (Tracking Send Phase holds while the rates differ).
+//  - the app's share of it: visionOS can hand the app only every second display frame (22.22 ms
+//    at 90 Hz, 20.00 ms at 100 Hz) and reproject in between. Seen in run 32 (2026-09-30) for
+//    minutes at a time while our own deadlines were met; the cause is not known (GPU load,
+//    thermal state?), so the log line carries the thermal state and the video filter.
+// Measured from successive optimalInputTimes. A rate is reported once it has held for
+// stableFrames frames in a row, so transitions and single late frames do not produce lines.
 final class DisplayRateWatch {
     static let shared = DisplayRateWatch()
     static let tolerance = 0.0003
 
-    private static let framesBeforeActing = 90
-    private static let retryInterval = 10.0
+    private static let stableFrames = 90
+    private static let runTolerance = 0.0005
 
-    private var period = 1.0 / 90.0
     private var lastOptimal = 0.0
-    private var mismatchedFrames = 0
-    private var mismatched = false
-    private var lastRequest = 0.0
-    private var requests = 0
+    private var runPeriod = 0.0
+    private var runLength = 0
+    private var reportedPeriod = 0.0
+    private var streaming = false
+    private var thermalObserver: NSObjectProtocol?
 
     // The stream's frame period: the streamer's refresh rate hint, else the display preference.
     static func streamPeriod() -> Double {
@@ -2366,39 +2406,249 @@ final class DisplayRateWatch {
         return rate > 0 ? 1.0 / rate : 1.0 / 90.0
     }
 
+    static func thermalStateName() -> String {
+        switch ProcessInfo.processInfo.thermalState {
+        case .nominal: return "nominal"
+        case .fair: return "fair"
+        case .serious: return "serious"
+        case .critical: return "critical"
+        @unknown default: return "unknown"
+        }
+    }
+
+    private init() {
+        thermalObserver = NotificationCenter.default.addObserver(
+            forName: ProcessInfo.thermalStateDidChangeNotification, object: nil, queue: nil
+        ) { _ in
+            pyroLog("Thermal state: \(DisplayRateWatch.thermalStateName())")
+        }
+    }
+
+    // What a frame period means: the display at the preferred rate or at 100 Hz, and the app at
+    // every display frame or every second one.
+    private static func describe(_ period: Double, wanted: Double) -> String {
+        let near = { (a: Double, b: Double) in abs(a - b) < 2 * runTolerance }
+        if near(period, wanted) {
+            return "every display frame at the preferred rate"
+        }
+        if near(period, 0.01) {
+            return "every display frame, display at 100 Hz (visionOS detected 50 Hz flicker from artificial light; stream at 100 fps to match)"
+        }
+        if near(period, 2 * wanted) {
+            return String(format: "every SECOND display frame at %.0f Hz: visionOS throttles the app and reprojects in between", 1.0 / wanted)
+        }
+        if near(period, 0.02) {
+            return "every SECOND display frame, display at 100 Hz (flicker compensation) and the app throttled on top"
+        }
+        return "no known pattern"
+    }
+
     func observe(optimalInputTime: LayerRenderer.Clock.Instant) {
         let optimal = LayerRenderer.Clock.Instant.epoch.duration(to: optimalInputTime).timeInterval
         let interval = optimal - lastOptimal
         lastOptimal = optimal
-        guard interval > 0.006 && interval < 0.02 else {
-            return
-        }
-        period += (interval - period) * 0.1
-
         let wanted = Double(refreshRate) > 0 ? 1.0 / Double(refreshRate) : Self.streamPeriod()
-        guard EventHandler.shared.streamingActive, abs(period - wanted) > Self.tolerance else {
-            if mismatched && EventHandler.shared.streamingActive {
-                pyroLog(String(format: "Display rate: back at %.1f Hz", 1.0 / period))
-            }
-            mismatched = false
-            mismatchedFrames = 0
-            requests = 0
+        guard EventHandler.shared.streamingActive else {
+            // A new stream starts from the preferred rate, so a matching rate stays silent.
+            reportedPeriod = wanted
+            runLength = 0
+            streaming = false
             return
         }
-        mismatchedFrames += 1
-        let now = CACurrentMediaTime()
-        guard mismatchedFrames >= Self.framesBeforeActing, now - lastRequest >= Self.retryInterval else {
+        if !streaming {
+            streaming = true
+            pyroLog("Thermal state at stream start: \(Self.thermalStateName())")
+        }
+        guard interval > 0.006 && interval < 0.05 else {
+            runLength = 0
             return
         }
-        if !mismatched {
-            pyroLog(String(format: "Display rate: visionOS runs the display at %.1f Hz, the preference is %.0f Hz and the stream %.0f fps", 1.0 / period, Double(refreshRate), 1.0 / Self.streamPeriod()))
+        if runLength > 0 && abs(interval - runPeriod) < Self.runTolerance {
+            runLength += 1
+            runPeriod += (interval - runPeriod) * 0.1
         }
-        mismatched = true
-        lastRequest = now
-        requests += 1
-        pyroLog("Display rate: asking for \(refreshRate) Hz again (request \(requests) while mismatched)")
-        let hint = EventHandler.shared.streamEvent?.STREAMING_STARTED.refresh_rate_hint ?? 0
-        VideoHandler.applyRefreshRate(videoFormat: EventHandler.shared.videoFormat, streamRateForDefault: hint > 0 ? hint : nil)
+        else {
+            runPeriod = interval
+            runLength = 1
+        }
+        guard runLength == Self.stableFrames, abs(runPeriod - reportedPeriod) > Self.runTolerance else {
+            return
+        }
+        reportedPeriod = runPeriod
+        pyroLog(String(format: "Frame rate: visionOS hands the app a frame every %.2f ms (%.1f Hz), ", runPeriod * 1000.0, 1.0 / runPeriod)
+            + Self.describe(runPeriod, wanted: wanted)
+            + String(format: " | preference %.0f Hz, stream %.0f fps", Double(refreshRate), 1.0 / Self.streamPeriod())
+            + " | thermal \(Self.thermalStateName()), video filter \(ALVRClientApp.gStore.settings.videoFilter)")
     }
 }
 
+
+// Rate map and pixel density diagnostics (2026-09-30). The drawable's rasterization rate map says
+// where visionOS renders at full density; with the view tangents that gives the pixels per degree
+// at the view center, both for the drawable (what the headset can show) and for the stream (what
+// the streamer sends, its full-resolution FFE center). Logged at stream start and whenever the
+// drawable's size changes:
+//   "Drawable: screen WxH ..."           sizes and granularity of the rate map
+//   "Drawable eye N: FOV ... | PPD ..."  center pixels per degree and the full-rate region
+//   "Stream: ... PPD ..."                the same for the stream, and stream/drawable
+// Every 10 s while streaming, "Rate map: ..." says whether the map changed (sampled 10 times a
+// second). A map that follows the gaze would show changes and a moving full-rate center; that
+// would be the data for gaze-driven foveated encoding.
+final class RateMapDiag {
+    static let shared = RateMapDiag()
+
+    private struct Axis {
+        var fullStart = 0.0   // screen fraction where the full-rate span starts
+        var fullEnd = 0.0
+        var highShare = 0.0   // share of the screen at >= 85 % of the peak rate
+        var minRate = 1.0
+        var center: Double { (fullStart + fullEnd) / 2 }
+    }
+    private struct Eye {
+        var x = Axis()
+        var y = Axis()
+        var physical = MTLSize(width: 0, height: 0, depth: 0)
+    }
+
+    private static let sampleEvery = 9          // frames, ~10 Hz at 90 Hz
+    private static let logInterval = 10.0       // seconds
+
+    private var reported = false
+    private var lastScreen = MTLSize(width: 0, height: 0, depth: 0)
+    private var lastSignature: [Double] = []
+    private var frames = 0
+    private var samples = 0
+    private var changes = 0
+    private var centerRange: [(minX: Double, maxX: Double, minY: Double, maxY: Double)] = []
+    private var lastLog = 0.0
+
+    func observe(drawable: LayerRenderer.Drawable) {
+        guard EventHandler.shared.streamingActive, EventHandler.shared.lastIpd != -1,
+              let vrr = drawable.rasterizationRateMaps.first else {
+            reported = false
+            return
+        }
+        frames += 1
+        let screen = vrr.screenSize
+        let changedSize = screen.width != lastScreen.width || screen.height != lastScreen.height
+        guard !reported || changedSize || frames % Self.sampleEvery == 0 else {
+            return
+        }
+
+        let eyes = (0..<min(2, vrr.layerCount)).map { Self.eye(vrr, layer: $0) }
+        if !reported || changedSize {
+            reported = true
+            lastScreen = screen
+            report(drawable: drawable, vrr: vrr, eyes: eyes)
+            lastSignature = []
+            resetWindow(eyes: eyes)
+        }
+
+        // What would move if the map followed the gaze: the full-rate span of each axis, per eye,
+        // and the shape of the falloff around it.
+        let signature = eyes.flatMap { [$0.x.fullStart, $0.x.fullEnd, $0.y.fullStart, $0.y.fullEnd,
+                                        $0.x.highShare, $0.y.highShare, $0.x.minRate, $0.y.minRate,
+                                        Double($0.physical.width), Double($0.physical.height)] }
+            .map { ($0 * 1000).rounded() / 1000 }
+        if !lastSignature.isEmpty && signature != lastSignature {
+            changes += 1
+        }
+        lastSignature = signature
+        samples += 1
+        for (i, eye) in eyes.enumerated() where i < centerRange.count {
+            centerRange[i].minX = min(centerRange[i].minX, eye.x.center)
+            centerRange[i].maxX = max(centerRange[i].maxX, eye.x.center)
+            centerRange[i].minY = min(centerRange[i].minY, eye.y.center)
+            centerRange[i].maxY = max(centerRange[i].maxY, eye.y.center)
+        }
+
+        let now = CACurrentMediaTime()
+        if now - lastLog >= Self.logInterval {
+            let centers = centerRange.enumerated().map { (i, r) in
+                String(format: "eye %ld center x %.1f-%.1f %% y %.1f-%.1f %%", i,
+                       r.minX * 100, r.maxX * 100, r.minY * 100, r.maxY * 100)
+            }.joined(separator: " | ")
+            pyroLog("Rate map: \(changes) changes in \(samples) samples over \(Int(Self.logInterval)) s" +
+                    (changes == 0 ? " (static)" : " (changing)") + " | " + centers)
+            resetWindow(eyes: eyes)
+        }
+    }
+
+    private func resetWindow(eyes: [Eye]) {
+        lastLog = CACurrentMediaTime()
+        samples = 0
+        changes = 0
+        centerRange = eyes.map { (minX: $0.x.center, maxX: $0.x.center, minY: $0.y.center, maxY: $0.y.center) }
+    }
+
+    // The map is separable per layer, so one row and one column describe it.
+    private static func eye(_ vrr: MTLRasterizationRateMap, layer: Int) -> Eye {
+        let granularity = vrr.physicalGranularity
+        let physical = vrr.physicalSize(layer: layer)
+        func axis(horizontal: Bool) -> Axis {
+            let cellSize = horizontal ? granularity.width : granularity.height
+            let cells = (horizontal ? physical.width : physical.height) / max(cellSize, 1)
+            let screenSize = Double(horizontal ? vrr.screenSize.width : vrr.screenSize.height)
+            var spans: [(start: Double, end: Double, rate: Double)] = []
+            for j in 0..<cells {
+                let p0 = Float(j * cellSize), p1 = Float((j + 1) * cellSize)
+                let s0 = vrr.screenCoordinates(physicalCoordinates: MTLCoordinate2D(x: horizontal ? p0 : 0, y: horizontal ? 0 : p0), layer: layer)
+                let s1 = vrr.screenCoordinates(physicalCoordinates: MTLCoordinate2D(x: horizontal ? p1 : 0, y: horizontal ? 0 : p1), layer: layer)
+                let a = Double(horizontal ? s0.x : s0.y), b = Double(horizontal ? s1.x : s1.y)
+                if b > a {
+                    spans.append((a / screenSize, b / screenSize, Double(cellSize) / (b - a)))
+                }
+            }
+            var result = Axis()
+            guard let peak = spans.map({ $0.rate }).max(), peak > 0 else { return result }
+            let full = spans.filter { $0.rate >= 0.99 * peak }
+            result.fullStart = full.first?.start ?? 0
+            result.fullEnd = full.last?.end ?? 0
+            result.highShare = spans.filter { $0.rate >= 0.85 * peak }.reduce(0) { $0 + ($1.end - $1.start) }
+            result.minRate = (spans.map { $0.rate }.min() ?? peak) / peak
+            return result
+        }
+        return Eye(x: axis(horizontal: true), y: axis(horizontal: false), physical: physical)
+    }
+
+    // Pixels per degree at the view center of a rectilinear image `pixels` wide over the tangents.
+    private static func centerPPD(pixels: Int, tan0: Float, tan1: Float) -> Double {
+        let span = Double(tan0 + tan1)
+        return span > 0 ? Double(pixels) / span * Double.pi / 180 : 0
+    }
+
+    private static func degrees(_ t: Float) -> Double { Double(atan(t)) * 180 / Double.pi }
+
+    private func report(drawable: LayerRenderer.Drawable, vrr: MTLRasterizationRateMap, eyes: [Eye]) {
+        let screen = vrr.screenSize
+        let physical = eyes.map { "\($0.physical.width)x\($0.physical.height)" }.joined(separator: " / ")
+        pyroLog("Drawable: screen \(screen.width)x\(screen.height), physical \(physical), granularity \(vrr.physicalGranularity.width)x\(vrr.physicalGranularity.height), \(drawable.views.count) views, \(drawable.rasterizationRateMaps.count) rate maps")
+
+        let real = EventHandler.shared.realViewTangents
+        let sent = EventHandler.shared.sentViewTangents
+        var drawablePPD: [Double] = []
+        for (i, eye) in eyes.enumerated() where i < real.count {
+            let t = real[i]  // left, right, up, down
+            let ppdX = Self.centerPPD(pixels: screen.width, tan0: t.x, tan1: t.y)
+            let ppdY = Self.centerPPD(pixels: screen.height, tan0: t.z, tan1: t.w)
+            drawablePPD.append(ppdX)
+            pyroLog(String(format: "Drawable eye %ld: FOV left %.1f right %.1f up %.1f down %.1f deg | center PPD %.1f x %.1f | full rate x %.1f %% at %.1f %%, y %.1f %% at %.1f %% | >=85%% x %.1f %%, y %.1f %% | edge rate x 1/%.1f, y 1/%.1f",
+                           i, Self.degrees(t.x), Self.degrees(t.y), Self.degrees(t.z), Self.degrees(t.w), ppdX, ppdY,
+                           (eye.x.fullEnd - eye.x.fullStart) * 100, eye.x.center * 100,
+                           (eye.y.fullEnd - eye.y.fullStart) * 100, eye.y.center * 100,
+                           eye.x.highShare * 100, eye.y.highShare * 100,
+                           eye.x.minRate > 0 ? 1 / eye.x.minRate : 0, eye.y.minRate > 0 ? 1 / eye.y.minRate : 0))
+        }
+
+        if let started = EventHandler.shared.streamEvent?.STREAMING_STARTED {
+            let width = Int(started.view_width), height = Int(started.view_height)
+            for (i, t) in sent.enumerated() where i < 2 {
+                let ppdX = Self.centerPPD(pixels: width, tan0: t.x, tan1: t.y)
+                let ppdY = Self.centerPPD(pixels: height, tan0: t.z, tan1: t.w)
+                let ratio = i < drawablePPD.count && drawablePPD[i] > 0 ? ppdX / drawablePPD[i] : 0
+                pyroLog(String(format: "Stream eye %ld: %ldx%ld over FOV left %.1f right %.1f up %.1f down %.1f deg | center PPD %.1f x %.1f (stream/drawable %.2f)",
+                               i, width, height, Self.degrees(t.x), Self.degrees(t.y), Self.degrees(t.z), Self.degrees(t.w), ppdX, ppdY, ratio))
+            }
+        }
+    }
+}
