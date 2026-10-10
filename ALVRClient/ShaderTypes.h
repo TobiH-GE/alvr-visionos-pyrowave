@@ -26,6 +26,7 @@ typedef NS_ENUM(EnumBackingType, BufferIndex)
     BufferIndexPlaneUniforms = 3,
     BufferIndexEncodingUniforms = 4,
     BufferIndexVRR = 5,
+    BufferIndexFrameExtrapolation = 6,
 };
 
 typedef NS_ENUM(EnumBackingType, VertexAttribute)
@@ -63,6 +64,24 @@ typedef struct
 {
     matrix_float4x4 yuvTransform;
 } EncodingUniform;
+
+// The video fragment shader's view of FrameExtrapolation: the motion field of the frame being
+// shown (scene motion per frame interval of the source, head rotation taken out, picture pixels,
+// one vector per cell) and how far ahead to move it. alpha 0 shows the frame as decoded.
+typedef struct
+{
+    simd_float2 frameSize;   // picture pixels, both eyes side by side
+    float alpha;             // source frame intervals to extrapolate, 0 = off
+    float cellPixels;        // picture pixels per cell of the field
+    int cellsPerEye;
+    int gridRows;
+    int iterations;          // fixed point iterations inverting the field
+    int blendPrevious;       // 1: the previous frame is bound (textures 3, 4) and the field's pair;
+                             // 2: as 1, with the motion chosen per block at texture 5
+} FrameExtrapolationUniform;
+
+// "Choose motion per pixel": picture pixels per block of the choice (fxSelectMotion).
+#define FX_SELECT_BLOCK 8
 
 #endif /* ShaderTypes_h */
 

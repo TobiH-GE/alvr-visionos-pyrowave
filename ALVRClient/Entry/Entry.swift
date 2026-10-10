@@ -374,6 +374,82 @@ struct Entry: View {
                             saveAction()
                         }
 
+                        Toggle(isOn: $gStore.settings.frameInterpolation) {
+                            Text("Frame Interpolation")
+                            Text("When the stream runs slower than the display (45 fps at 90 Hz, 50 fps at 100 Hz), every second display shows an in-between frame, made once the next frame has arrived from the motion between the two: one display period (~11 ms) more latency for motion in the scene, head turns stay as fast as before. PyroWave, Metal renderer only.")
+                                .font(.system(size: 10))
+                        }
+                        .toggleStyle(.switch)
+                        .onChange(of: gStore.settings.frameInterpolation) {
+                            saveAction()
+                        }
+
+                        Toggle(isOn: $gStore.settings.useServerMotion) {
+                            Text("Interpolation: Use Server Motion Vectors")
+                            Text("Takes the motion from the vectors the streamer sends (its setting \"Send motion vectors\", NVIDIA Optical Flow on the original frames). Off: the motion is estimated on the headset's GPU from the PyroWave picture.")
+                                .font(.system(size: 10))
+                        }
+                        .toggleStyle(.switch)
+                        .onChange(of: gStore.settings.useServerMotion) {
+                            saveAction()
+                        }
+
+                        Toggle(isOn: $gStore.settings.frameInterpolationBlend) {
+                            Text("Interpolation: Blend Both Frames")
+                            Text("Builds the in-between from both frames, keeps still areas such as text exactly as decoded, and fades to a plain mix where the motion does not fit. Off: only the newer frame is moved, which costs far less GPU time at high resolutions.")
+                                .font(.system(size: 10))
+                        }
+                        .toggleStyle(.switch)
+                        .onChange(of: gStore.settings.frameInterpolationBlend) {
+                            saveAction()
+                        }
+
+                        Toggle(isOn: $gStore.settings.frameInterpolationStreamerChoice) {
+                            Text("Interpolation: Motion Choice from Streamer")
+                            Text("The streamer chooses, on the original frames, every 8x8 pixels between the motion vectors, head rotation only and no motion (HUD), and sends the choice with the vectors (its setting \"Send motion choice\"): the same as Choose Motion per Pixel, at no GPU cost here. Needs Use Server Motion Vectors; for frames without it, Choose Motion per Pixel applies if on.")
+                                .font(.system(size: 10))
+                        }
+                        .toggleStyle(.switch)
+                        .onChange(of: gStore.settings.frameInterpolationStreamerChoice) {
+                            saveAction()
+                        }
+
+                        Toggle(isOn: $gStore.settings.frameInterpolationSelect) {
+                            Text("Interpolation: Choose Motion per Pixel")
+                            Text("Once per new frame, every 8x8 pixels take whichever motion makes the two frames agree best on their PyroWave lowpass band (the motion field, head rotation only, none for HUD elements fixed to the view, optionally the neighbour cells' motion), on the headset's GPU. Fixes doubled and torn HUD text.")
+                                .font(.system(size: 10))
+                        }
+                        .toggleStyle(.switch)
+                        .onChange(of: gStore.settings.frameInterpolationSelect) {
+                            saveAction()
+                        }
+                        if gStore.settings.frameInterpolationSelect {
+                            HStack {
+                                Text("Candidates")
+                                Slider(value: $gStore.settings.frameInterpolationSelectCandidates, in: 3...7, step: 1) {
+                                    Text("Motion Choice Candidates")
+                                }
+                                .onChange(of: gStore.settings.frameInterpolationSelectCandidates) {
+                                    saveAction()
+                                }
+                                Text(String(format: "%.0f", gStore.settings.frameInterpolationSelectCandidates))
+                                    .frame(width: 50)
+                            }
+                            HStack {
+                                Text("Samples")
+                                Slider(value: $gStore.settings.frameInterpolationSelectGrid, in: 2...3, step: 1) {
+                                    Text("Motion Choice Samples")
+                                }
+                                .onChange(of: gStore.settings.frameInterpolationSelectGrid) {
+                                    saveAction()
+                                }
+                                Text(gStore.settings.frameInterpolationSelectGrid >= 2.5 ? "3x3" : "2x2")
+                                    .frame(width: 50)
+                            }
+                            Text("3 candidates and 2x2 samples cost about a fifth of 7 and 3x3 in GPU time.")
+                                .font(.system(size: 10))
+                        }
+
                         Toggle(isOn: $gStore.settings.maxRenderQuality) {
                             Text("Max Render Quality")
                             Text("Renders at visionOS's maximum render quality (6262x5020 per eye instead of 4338x3478), so a sharper stream center is shown as sent. Match the streamer's resolution (e.g. 6240x4992) to use it. Costs GPU time on the headset. Metal renderer, visionOS 26; takes effect the next time the stream opens.")

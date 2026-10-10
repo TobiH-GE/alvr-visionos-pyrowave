@@ -142,6 +142,34 @@ class Renderer {
     
     var drawPlanesWithInformedColors: Bool = false
     var fadeInOverlayAlpha: Float = 0.0
+    // Frame extrapolation for the frame being rendered (motion field and uniform), set in
+    // renderFrame, bound by beginRenderStreamingFrame; nil shows the frame as decoded.
+    var frameExtrapolationState: (MTLTexture, FrameExtrapolationUniform)? = nil
+    // The frame shown now and the one shown before it, for interpolation from both; the previous
+    // one is bound (textures 3, 4) only when it is the frame the field's motion starts from.
+    var frameInterpolationShown: QueuedFrame? = nil
+    var frameInterpolationPrevious: QueuedFrame? = nil
+    var frameInterpolationBlendWith: QueuedFrame? = nil
+    var frameInterpolationSelection: MTLTexture? = nil
+
+    // The luma plane of a PyroWave frame (10 bit in 16 bit containers) as a Metal texture.
+    func makeLumaTexture(_ pixelBuffer: CVPixelBuffer) -> CVMetalTexture? {
+        var textureOut: CVMetalTexture?
+        guard CVMetalTextureCacheCreateTextureFromImage(nil, metalTextureCache, pixelBuffer, nil, .r16Unorm,
+                                                        CVPixelBufferGetWidthOfPlane(pixelBuffer, 0),
+                                                        CVPixelBufferGetHeightOfPlane(pixelBuffer, 0),
+                                                        0, &textureOut) == kCVReturnSuccess,
+              let textureOut, CVMetalTextureGetTexture(textureOut) != nil else {
+            return nil
+        }
+        return textureOut
+    }
+    lazy var frameExtrapolationIdleTexture: MTLTexture? = {
+        let d = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rg16Float, width: 1, height: 1, mipmapped: false)
+        d.usage = [.shaderRead]
+        d.storageMode = .private
+        return device.makeTexture(descriptor: d)
+    }()
     var coolPulsingColorsTime: Float = 0.0
     private let chaperoneSystem = ChaperoneSystem()
 #if CHAPERONE_PROFILE
@@ -327,6 +355,7 @@ class Renderer {
         }
 
         let foveationVars = FFR.calculateFoveationVars(alvrEvent: streamEvent.STREAMING_STARTED, foveationSettings: settings.video.foveated_encoding)
+        FrameExtrapolation.setFoveation(foveationVars)
         videoFramePipelineState_YpCbCrBiPlanar = try! buildRenderPipelineForVideoFrameWithDevice(
                             device: device,
                             mtlVertexDescriptor: mtlVertexDescriptor,
@@ -758,6 +787,10 @@ class Renderer {
         }
         let startPollTime = CACurrentMediaTime()
         var pickedFromQueue = false
+        // Client setting "frame interpolation": a new PyroWave frame is only taken once its motion
+        // is known (at most a display period later), so its first display can be the in-between.
+        let holdBackFor: FrameExtrapolation? = ALVRClientApp.gStore.settings.frameInterpolation && EventHandler.shared.lastQueuedFrame != nil
+            ? EventHandler.shared.pyroWaveDecoder?.frameExtrapolation : nil
         while true {
             sched_yield()
             
@@ -776,10 +809,21 @@ class Renderer {
                 // Newest frame wins: an older one would only be shown late.
                 EventHandler.shared.frameQueue.removeFirst(EventHandler.shared.frameQueue.count - 1)
             }
-            queuedFrame = EventHandler.shared.frameQueue.count > 0 ? EventHandler.shared.frameQueue.removeFirst() : nil
+            var heldBack = false
+            if let holdBackFor, let next = EventHandler.shared.frameQueue.first,
+               holdBackFor.shouldHoldBack(timestamp: next.timestamp, queuedTime: next.queuedTime) {
+                heldBack = true
+                queuedFrame = nil
+            } else {
+                queuedFrame = EventHandler.shared.frameQueue.count > 0 ? EventHandler.shared.frameQueue.removeFirst() : nil
+            }
             objc_sync_exit(EventHandler.shared.frameQueueLock)
             if queuedFrame != nil {
                 pickedFromQueue = true
+                break
+            }
+            if heldBack {
+                // Show the current frame once more; the new one waits for its motion.
                 break
             }
             
@@ -1005,7 +1049,59 @@ class Renderer {
         }
         
         let deviceAnchor = WorldTracker.shared.worldTracking.queryDeviceAnchor(atTimestamp: vsyncTime)
-        
+
+        // Client setting "Frame Interpolation" (GlobalSettings.frameInterpolation): a slower PyroWave
+        // stream (45 fps on 90 Hz) gets in-between frames. See FrameExtrapolation.swift.
+        frameExtrapolationState = nil
+        frameInterpolationBlendWith = nil
+        frameInterpolationSelection = nil
+        let frameInterpolation = ALVRClientApp.gStore.settings.frameInterpolation
+        if frameInterpolation,
+           let frameExtrapolation = EventHandler.shared.pyroWaveDecoder?.frameExtrapolation {
+            frameExtrapolation.noteDisplay(vsync: vsyncTime)
+            frameExtrapolation.setViewGeometry(FrameExtrapolation.ViewGeometry(tangents: EventHandler.shared.sentViewTangents))
+            if let queuedFrame, PyroWaveDecoder.isPyroWaveFrame(queuedFrame.imageBuffer) {
+                if queuedFrame.timestamp != frameInterpolationShown?.timestamp {
+                    frameInterpolationPrevious = frameInterpolationShown
+                    frameInterpolationShown = queuedFrame
+                }
+                var (texture, uniform, previousTimestamp) = frameExtrapolation.renderState(
+                    timestamp: queuedFrame.timestamp, vsync: vsyncTime)
+                frameInterpolationBlendWith = nil
+                let blend = ALVRClientApp.gStore.settings.frameInterpolationBlend
+                let select = ALVRClientApp.gStore.settings.frameInterpolationSelect
+                let streamerChoice = ALVRClientApp.gStore.settings.frameInterpolationStreamerChoice
+                    && ALVRClientApp.gStore.settings.useServerMotion
+                if frameInterpolation, blend || select || streamerChoice, uniform.alpha < 0,
+                   let previous = frameInterpolationPrevious, previous.timestamp == previousTimestamp {
+                    if blend {
+                        uniform.blendPrevious = 1
+                        frameInterpolationBlendWith = previous
+                    }
+                    // "Choose motion per pixel": made once per frame, before this display's render pass.
+                    // With Blend Both Frames the in-between mixes both frames along the chosen motion
+                    // (mode 2); without, only the newer frame is moved along it (mode 3), much cheaper
+                    // at high stream resolutions (measured 2026-10-09 at 7040x2496: ~4 instead of ~20 ms
+                    // per in-between display).
+                    // The streamer's choice, made on the original frames, comes first; the choice here
+                    // only for frames without it.
+                    if streamerChoice,
+                       let choice = frameExtrapolation.streamerChoice(timestamp: queuedFrame.timestamp,
+                                                                      previousTimestamp: previousTimestamp) {
+                        uniform.blendPrevious = blend ? 2 : 3
+                        frameInterpolationSelection = choice
+                    } else if select,
+                       let selection = frameExtrapolation.selection(commandBuffer: commandBuffer, field: texture,
+                                                                    timestamp: queuedFrame.timestamp,
+                                                                    previousTimestamp: previousTimestamp) {
+                        uniform.blendPrevious = blend ? 2 : 3
+                        frameInterpolationSelection = selection
+                    }
+                }
+                frameExtrapolationState = (texture, uniform)
+            }
+        }
+
         commandBuffer.addCompletedHandler { (_ commandBuffer)-> Swift.Void in
             if EventHandler.shared.alvrInitialized && queuedFrame != nil && EventHandler.shared.lastSubmittedTimestamp != queuedFrame?.timestamp {
                 let currentTimeNs = UInt64(CACurrentMediaTime() * Double(NSEC_PER_SEC))
@@ -1838,6 +1934,7 @@ class Renderer {
         
         //print("Pixel format \(formatStr) (\(format))")
         let textureTypes = VideoHandler.getTextureTypesForFormat(format, allowSecret: allowSecret)
+        var boundTextures: [MTLTexture] = []
         
         for i in 0...1 {
             var textureOut:CVMetalTexture! = nil
@@ -1863,6 +1960,33 @@ class Renderer {
                 print("NO COMPRESSION ON VT FRAME!!!! AAAAAAAAA go file feedback again :(")
             }
             renderEncoder.setFragmentTexture(metalTexture, index: i)
+            boundTextures.append(metalTexture)
+        }
+        // Frame interpolation from both frames: the previous frame's planes at 3 and 4; otherwise the
+        // current ones again, since the shader declares them.
+        var previousTextures: [MTLTexture] = []
+        if let previous = frameInterpolationBlendWith {
+            for i in 0...1 where i < textureTypes.count && textureTypes[i] != .invalid {
+                var textureOut: CVMetalTexture?
+                let buffer = previous.imageBuffer
+                if CVMetalTextureCacheCreateTextureFromImage(nil, metalTextureCache, buffer, nil, textureTypes[i],
+                                                             CVPixelBufferGetWidthOfPlane(buffer, i), CVPixelBufferGetHeightOfPlane(buffer, i),
+                                                             i, &textureOut) == kCVReturnSuccess,
+                   let textureOut, let texture = CVMetalTextureGetTexture(textureOut) {
+                    previousTextures.append(texture)
+                }
+            }
+        }
+        let blendTextures = previousTextures.count == 2 ? previousTextures : boundTextures
+        for (i, texture) in blendTextures.prefix(2).enumerated() {
+            renderEncoder.setFragmentTexture(texture, index: 3 + i)
+        }
+        // Modes 1 and 2 read the previous frame; mode 3 (chosen motion, newer frame only) does not.
+        if previousTextures.count != 2, let mode = frameExtrapolationState?.1.blendPrevious, mode == 1 || mode == 2 {
+            frameExtrapolationState?.1.blendPrevious = 0
+        }
+        if let selection = frameInterpolationSelection ?? frameExtrapolationIdleTexture {
+            renderEncoder.setFragmentTexture(selection, index: 5)
         }
         
         // Snoop for pixel formats
@@ -1892,6 +2016,13 @@ class Renderer {
 #endif
         
         renderEncoder.setVertexBuffer(dynamicUniformBuffer, offset:uniformBufferOffset, index: BufferIndex.uniforms.rawValue)
+
+        // Frame extrapolation: the motion field and how far to move along it (alpha 0 = as decoded).
+        var fxUniform = frameExtrapolationState?.1 ?? FrameExtrapolationUniform()
+        if let fxTexture = frameExtrapolationState?.0 ?? frameExtrapolationIdleTexture {
+            renderEncoder.setFragmentTexture(fxTexture, index: 2)
+        }
+        renderEncoder.setFragmentBytes(&fxUniform, length: MemoryLayout<FrameExtrapolationUniform>.stride, index: BufferIndex.frameExtrapolation.rawValue)
 
         return renderEncoder
     }
@@ -2475,6 +2606,7 @@ final class DisplayRateWatch {
             return
         }
         reportedPeriod = runPeriod
+        EventHandler.shared.updateDisplayRate(period: runPeriod)
         pyroLog(String(format: "Frame rate: visionOS hands the app a frame every %.2f ms (%.1f Hz), ", runPeriod * 1000.0, 1.0 / runPeriod)
             + Self.describe(runPeriod, wanted: wanted)
             + String(format: " | preference %.0f Hz, stream %.0f fps", Double(refreshRate), 1.0 / Self.streamPeriod())

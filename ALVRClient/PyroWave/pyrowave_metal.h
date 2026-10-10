@@ -382,6 +382,17 @@ pyrowave_frame_get_block_counts(pyrowave_frame frame, int *received_blocks, int 
 PYROWAVE_PUBLIC_API void
 pyrowave_frame_end(pyrowave_frame frame);
 
+// ALVR extension: the LL (lowpass) band of a component at a wavelet level, as the decoder holds
+// it, for motion estimation on the decoded frame (FrameExtrapolation in the app). A single 2D
+// R16F view (R32F at PYROWAVE_PRECISION=2) of the decoder's pyramid, (aligned width / 2) >> level
+// by (aligned height / 2) >> level texels, of which the first (plane width / 2) >> level columns
+// are the picture. Levels 0-3 are written by the iDWT of the next coarser level, level 4 is the
+// coarsest band straight from the bitstream; no DC shift is applied. The decoder overwrites it
+// with the next frame: copy what you need in the same command buffer, after the decode work.
+// NULL for an invalid component or level.
+PYROWAVE_PUBLIC_API pyrowave_mtl_texture
+pyrowave_decoder_get_lowpass_texture(pyrowave_decoder decoder, int component, int level);
+
 #ifdef __cplusplus
 }
 #endif

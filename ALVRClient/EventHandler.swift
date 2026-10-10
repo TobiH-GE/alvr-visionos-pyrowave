@@ -188,11 +188,18 @@ class EventHandler: ObservableObject {
             print("Initialize ALVR")
             alvrInitialized = true
             var refreshRates:[Float] = [100, 96, 90]
-            
+
             // HACK: Detect hardware type
             if VTIsHardwareDecodeSupported(kCMVideoCodecType_AV1) {
                 refreshRates = [120, 100, 96, 90]
             }
+            // 45: the streamer (Preferred FPS 45) runs SteamVR and the game at 45 fps, the display
+            // stays at 90 Hz (VideoHandler.applyRefreshRate) and Frame Interpolation fills in.
+            refreshRates.append(45)
+            // 50: the same at 100 Hz, for rooms where visionOS runs the display at 100 Hz anyway
+            // (50 Hz flicker from artificial light). Without it here the streamer's Preferred FPS
+            // 50 fell back to 45 ("Chosen refresh rate not supported", 2026-10-09).
+            refreshRates.append(50)
 
             let capabilities = AlvrClientCapabilities(default_view_width: UInt32(renderWidth*2), default_view_height: UInt32(renderHeight*2), refresh_rates: refreshRates, refresh_rates_count: UInt64(refreshRates.count), foveated_encoding: true, encoder_high_profile: true, encoder_10_bits: true, encoder_av1: VTIsHardwareDecodeSupported(kCMVideoCodecType_AV1), encoder_pyrowave: PyroWaveDecoder.isSupported(), prefer_10bit: true, prefer_full_range: true, preferred_encoding_gamma: 1.5, prefer_hdr: false)
             alvr_initialize(/*capabilities=*/capabilities)
@@ -711,6 +718,47 @@ class EventHandler: ObservableObject {
     }
     
     // Restart the ALVR client framework's event thread if it's unresponsive.
+    // "Rescan": drops the connection and searches for the streamer again as after app start; the
+    // core opens new announce sockets on the interfaces present now (wired first). Pause/resume is
+    // the same path leaving the immersive space takes. The pause has to last until the search loop
+    // (0.5 s per round) has seen it, otherwise it keeps its old sockets.
+    @Published var rescanning = false
+
+    // True while visionOS runs the display at 100 Hz (flicker compensation) although the app asks
+    // for less; shown as a warning next to "Enter". Fed by DisplayRateProbe in the window and by
+    // DisplayRateWatch in the immersive space; a period that is neither 90 nor 100 Hz (every
+    // display frame or every second one) changes nothing.
+    @Published var displayAt100Hz = false
+
+    func updateDisplayRate(period: Double) {
+        let near = { (p: Double, tolerance: Double) in abs(period - p) < tolerance }
+        let at100 = near(0.010, 0.0007) || near(0.020, 0.0014)
+        let at90 = near(1.0 / 90.0, 0.0007) || near(2.0 / 90.0, 0.0014)
+        guard at100 || at90 else { return }
+        let warn = at100 && refreshRate < 99
+        DispatchQueue.main.async {
+            if self.displayAt100Hz != warn {
+                pyroLog("Display rate warning: \(warn ? "display at 100 Hz" : "display back at 90 Hz")")
+                self.displayAt100Hz = warn
+            }
+        }
+    }
+
+    func rescan() {
+        guard alvrInitialized, !rescanning else { return }
+        rescanning = true
+        DispatchQueue.global(qos: .userInitiated).async {
+            pyroLog("Rescan: pausing the client core")
+            alvr_pause()
+            Thread.sleep(forTimeInterval: 1.0)
+            alvr_resume()
+            pyroLog("Rescan: resumed, searching for the streamer")
+            DispatchQueue.main.async {
+                self.rescanning = false
+            }
+        }
+    }
+
     func kickAlvr() {
         stop()
         alvrInitialized = false

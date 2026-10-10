@@ -57,6 +57,9 @@
 		E7F222422BE2F03800D10191 /* RealityKitClientView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7F222412BE2F03800D10191 /* RealityKitClientView.swift */; };
 		E7F222442BE2F21600D10191 /* SBSMaterial.usda in Resources */ = {isa = PBXBuildFile; fileRef = E7F222432BE2F21600D10191 /* SBSMaterial.usda */; };
 		507957410000000000000002 /* PyroWaveDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 507957410000000000000001 /* PyroWaveDecoder.swift */; };
+		5FE0F0000000000000000002 /* FrameExtrapolation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FE0F0000000000000000001 /* FrameExtrapolation.swift */; };
+		5FE0F0000000000000000004 /* FrameExtrapolationGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FE0F0000000000000000003 /* FrameExtrapolationGeometry.swift */; };
+		5FE0F0000000000000000006 /* FrameExtrapolation.metal in Sources */ = {isa = PBXBuildFile; fileRef = 5FE0F0000000000000000005 /* FrameExtrapolation.metal */; };
 		507957410000000000000006 /* pyrowave_common.mm in Sources */ = {isa = PBXBuildFile; fileRef = 507957410000000000000005 /* pyrowave_common.mm */; };
 		507957410000000000000008 /* pyrowave_decoder.mm in Sources */ = {isa = PBXBuildFile; fileRef = 507957410000000000000007 /* pyrowave_decoder.mm */; };
 		50795741000000000000000A /* pyrowave_encoder.mm in Sources */ = {isa = PBXBuildFile; fileRef = 507957410000000000000009 /* pyrowave_encoder.mm */; };
@@ -159,6 +162,9 @@
 		E7F222412BE2F03800D10191 /* RealityKitClientView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealityKitClientView.swift; sourceTree = "<group>"; };
 		E7F222432BE2F21600D10191 /* SBSMaterial.usda */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = SBSMaterial.usda; sourceTree = "<group>"; };
 		507957410000000000000001 /* PyroWaveDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PyroWaveDecoder.swift; sourceTree = "<group>"; };
+		5FE0F0000000000000000001 /* FrameExtrapolation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameExtrapolation.swift; sourceTree = "<group>"; };
+		5FE0F0000000000000000003 /* FrameExtrapolationGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameExtrapolationGeometry.swift; sourceTree = "<group>"; };
+		5FE0F0000000000000000005 /* FrameExtrapolation.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = FrameExtrapolation.metal; sourceTree = "<group>"; };
 		507957410000000000000003 /* pyrowave_metal.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = pyrowave_metal.h; sourceTree = "<group>"; };
 		507957410000000000000004 /* pyrowave_common.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = pyrowave_common.hpp; sourceTree = "<group>"; };
 		507957410000000000000005 /* pyrowave_common.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = pyrowave_common.mm; sourceTree = "<group>"; };
@@ -266,6 +272,9 @@
 				C5E590392B6379ED00328ED6 /* ShaderTypes.h */,
 				D61E6FDF2B71CE080076031A /* VideoHandler.swift */,
 				507957410000000000000001 /* PyroWaveDecoder.swift */,
+				5FE0F0000000000000000001 /* FrameExtrapolation.swift */,
+				5FE0F0000000000000000003 /* FrameExtrapolationGeometry.swift */,
+				5FE0F0000000000000000005 /* FrameExtrapolation.metal */,
 				507957410000000000000100 /* PyroWave */,
 				E78D482C2EBA7504000F77D7 /* AV1Parser.swift */,
 				E78D482E2EBA76B8000F77D7 /* NALParser.swift */,
@@ -478,6 +487,9 @@
 				E70C9AEA2C9377F50035B4F9 /* Codable.swift in Sources */,
 				D61E6FE02B71CE080076031A /* VideoHandler.swift in Sources */,
 				507957410000000000000002 /* PyroWaveDecoder.swift in Sources */,
+				5FE0F0000000000000000002 /* FrameExtrapolation.swift in Sources */,
+				5FE0F0000000000000000004 /* FrameExtrapolationGeometry.swift in Sources */,
+				5FE0F0000000000000000006 /* FrameExtrapolation.metal in Sources */,
 				507957410000000000000006 /* pyrowave_common.mm in Sources */,
 				507957410000000000000008 /* pyrowave_decoder.mm in Sources */,
 				50795741000000000000000A /* pyrowave_encoder.mm in Sources */,

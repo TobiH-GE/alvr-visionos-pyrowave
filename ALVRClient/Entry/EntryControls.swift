@@ -24,6 +24,15 @@ struct EntryControls: View {
         
         HStack(spacing: 17) {
             if eventHandler.connectionState == .connected {
+                Button {
+                    eventHandler.rescan()
+                } label: {
+                    Label("Rescan", systemImage: "arrow.clockwise")
+                        .labelStyle(.titleAndIcon)
+                        .padding(15)
+                }
+                .disabled(model.isShowingClient || eventHandler.rescanning)
+
                 Toggle(isOn: $model.isShowingClient) {
                     Label("Enter", systemImage: "visionpro")
                         .labelStyle(.titleAndIcon)
@@ -34,7 +43,17 @@ struct EntryControls: View {
                     .labelStyle(.titleOnly)
                     .padding(15)
             }
-            
+
+            if eventHandler.displayAt100Hz {
+                Label("100 Hz", systemImage: "exclamationmark.triangle.fill")
+                    .labelStyle(.titleAndIcon)
+                    .foregroundStyle(.red)
+                    .padding(15)
+                    .help("visionOS runs the display at 100 Hz: it detected 50 Hz flicker from artificial light. A 45 or 90 fps stream will stutter. Switch off or replace the flickering light.")
+            }
+        }
+        .onAppear {
+            DisplayRateProbe.shared.start()
         }
         .toggleStyle(.button)
         .buttonStyle(.borderless)

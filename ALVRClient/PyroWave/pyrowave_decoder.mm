@@ -747,3 +747,12 @@ void pyrowave_frame_end(pyrowave_frame frame)
 	if (frame)
 		frame->in_use = false;
 }
+
+// ALVR extension: the decoder's own LL (lowpass) bands, for motion estimation on the decoded
+// frame (FrameExtrapolation in the app). See pyrowave_metal.h.
+pyrowave_mtl_texture pyrowave_decoder_get_lowpass_texture(pyrowave_decoder decoder, int component, int level)
+{
+	if (!decoder || component < 0 || component >= NumComponents || level < 0 || level >= DecompositionLevels)
+		return nullptr;
+	return (__bridge pyrowave_mtl_texture)decoder->wavelet.component_ll_views[component][level];
+}

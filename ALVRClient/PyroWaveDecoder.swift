@@ -224,10 +224,16 @@ final class PyroWaveDecoder {
     private var device: pyrowave_device?
     private var decoder: pyrowave_decoder?
     private var stripeCount = 0
+    // Frame interpolation (setting "Frame Interpolation"): the motion fields for the renderer's
+    // in-between frames, from the streamer's motion vectors or estimated on the lowpass bands.
+    private(set) var frameExtrapolation: FrameExtrapolation?
 
     // Network thread.
     private var current: Frame?
     private var newestFinishedTimestamp: UInt64 = 0
+    // The frames begun last and the one before it, for the streamer's motion vectors.
+    private var lastBegunTimestamp: UInt64 = 0
+    private var previousBegunTimestamp: UInt64 = 0
 
     // Statistics, from the network thread and from Metal's completion threads.
     private let statsLock = NSLock()
@@ -369,6 +375,7 @@ final class PyroWaveDecoder {
             return nil
         }
         stripeCount = Int(pyrowave_decoder_stripe_count(decoder))
+        frameExtrapolation = FrameExtrapolation(device: mtlDevice, width: config.width, height: config.height)
 
         pyroLog("PyroWave: decoder ready, \(config.width)x\(config.height) \(config.chroma444 ? "4:4:4" : "4:2:0"), \(stripeCount) stripes of \(config.stripeHeight) rows")
     }
@@ -387,6 +394,17 @@ final class PyroWaveDecoder {
 
     // Called on the network receive thread for every video packet of the stream.
     func receive(packet: UnsafeRawBufferPointer, timestamp: UInt64) {
+        // Motion vectors from the streamer (PyroWaveStripes::MotionStripe), not part of the picture.
+        if packet.count >= PacketPrefix.size,
+           UInt16(littleEndian: packet.loadUnaligned(fromByteOffset: 0, as: UInt16.self)) == 0xffff {
+            if ALVRClientApp.gStore.settings.frameInterpolation, ALVRClientApp.gStore.settings.useServerMotion,
+               let frameExtrapolation {
+                // The motion packets follow the frame's first packets, so the frame has begun.
+                let previous = timestamp == lastBegunTimestamp ? previousBegunTimestamp : lastBegunTimestamp
+                frameExtrapolation.receiveServerMotion(packet: packet, timestamp: timestamp, previousFrame: previous)
+            }
+            return
+        }
         guard let prefix = PacketPrefix(packet) else {
             pyroLog("PyroWave: dropping a malformed packet (\(packet.count) bytes)")
             return
@@ -417,6 +435,8 @@ final class PyroWaveDecoder {
                 return
             }
             current = frame
+            previousBegunTimestamp = lastBegunTimestamp
+            lastBegunTimestamp = timestamp
         }
         guard let frame = current else {
             return
@@ -559,6 +579,13 @@ final class PyroWaveDecoder {
             frame.chromaRowsInterleaved = chromaRows
         }
 
+        // Frame interpolation: keep this frame's lowpass bands (the headset's motion choice and, without
+        // the streamer's vectors, its own motion estimate work on them).
+        if final, result == PYROWAVE_SUCCESS, ALVRClientApp.gStore.settings.frameInterpolation,
+           let frameExtrapolation, let decoder {
+            frameExtrapolation.capture(decoder: decoder, commandBuffer: commandBuffer, timestamp: frame.timestamp)
+        }
+
         if !final {
             // The frame (its pixel buffer above all) must outlive every command buffer that
             // writes into it, also when it is dropped before its last step.
@@ -588,6 +615,8 @@ final class PyroWaveDecoder {
         commandBuffer.commit()
         if final {
             pyrowave_frame_end(frame.handle)
+            // Only after the commit: the estimation waits for this command buffer.
+            frameExtrapolation?.commitPendingEstimate()
         }
     }
 

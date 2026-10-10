@@ -993,6 +993,11 @@ struct VideoHandler {
         let streamFPS = ALVRClientApp.gStore.settings.streamFPS
 
         refreshRate = Float(streamFPS) ?? streamRateForDefault ?? defaultRefreshRate
+        // A stream below 60 fps (45 for Frame Interpolation) is shown at a multiple of its rate:
+        // visionOS has no 45 Hz mode, and each frame is then shown a whole number of times.
+        if refreshRate > 0 && refreshRate < 60 {
+            refreshRate *= (60 / refreshRate).rounded(.up)
+        }
 
         pyroLog("Setting refresh rate preference to: \(refreshRate)")
 
@@ -1034,5 +1039,39 @@ class RefreshRateDisplayLink: NSObject {
     }
 
     @objc private func tick(displayLink: CADisplayLink) {
+    }
+}
+
+// The display rate outside the immersive space, for the "100 Hz" warning in the Entry window:
+// visionOS runs the display at 100 Hz when it detects 50 Hz flicker from artificial light, and a
+// 45 or 90 fps stream then stutters. Asks for the same 90 Hz as RefreshRateDisplayLink, so it
+// does not pull the display anywhere itself; on a 100 Hz display it ticks every 10 or 20 ms. While
+// the immersive renderer runs, DisplayRateWatch measures instead.
+final class DisplayRateProbe: NSObject {
+    static let shared = DisplayRateProbe()
+    private var displayLink: CADisplayLink?
+    private var lastTimestamp = 0.0
+    private var intervals: [Double] = []
+
+    func start() {
+        guard displayLink == nil else { return }
+        let link = CADisplayLink(target: self, selector: #selector(tick))
+        link.preferredFrameRateRange = CAFrameRateRange(minimum: 90, maximum: 90, preferred: 90)
+        link.add(to: .main, forMode: .common)
+        displayLink = link
+    }
+
+    @objc private func tick(displayLink: CADisplayLink) {
+        let timestamp = displayLink.timestamp
+        defer { lastTimestamp = timestamp }
+        guard lastTimestamp > 0, !EventHandler.shared.renderStarted else {
+            intervals.removeAll()
+            return
+        }
+        intervals.append(timestamp - lastTimestamp)
+        guard intervals.count >= 90 else { return }
+        let median = intervals.sorted()[intervals.count / 2]
+        intervals.removeAll()
+        EventHandler.shared.updateDisplayRate(period: median)
     }
 }

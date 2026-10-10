@@ -62,6 +62,31 @@ struct GlobalSettings: Codable {
     // noise and ringing and can shimmer with head motion.
     var sharpenEnabled: Bool = false
     var sharpenStrength: Float = 0.5
+    // PyroWave, Metal renderer: when the stream runs slower than the display (45 fps at 90 Hz, 50 fps
+    // at 100 Hz), show an in-between frame on every second display, built once the next frame is
+    // there from the motion between the two (head rotation is still reprojected to the current
+    // pose). See FrameExtrapolation.swift.
+    var frameInterpolation: Bool = false
+    // Frame interpolation: use the motion vectors the streamer sends (its setting "Send motion
+    // vectors", NVIDIA Optical Flow on the original frames). Off: the motion is estimated here, on
+    // the GPU, from PyroWave's lowpass bands.
+    var useServerMotion: Bool = true
+    // Frame interpolation: build the in-between from both frames, keep still areas as decoded and
+    // fade to a plain mix where the motion does not fit. Off: only the newer frame is moved, which
+    // costs far less GPU time at high stream resolutions.
+    var frameInterpolationBlend: Bool = false
+    // Frame interpolation: choose per 8x8 pixels between the motion field, head rotation only and no
+    // motion (HUD), by how well the two frames agree on their PyroWave lowpass level 0.
+    var frameInterpolationSelect: Bool = false
+    // How many motions the choice compares (3: the field, head rotation only, none; 4-7 add the
+    // field of the neighbour cells) and on how many points per block (2: 2x2, 3: 3x3).
+    // 3 and 2x2 cost about a fifth of 7 and 3x3 and looked the same on the recordings (2026-10-09).
+    var frameInterpolationSelectCandidates: Float = 3
+    var frameInterpolationSelectGrid: Float = 2
+    // Frame interpolation: take the per-block motion choice the streamer makes on the original frames
+    // (its setting "Send motion choice") instead of choosing on the headset's GPU. For frames it has
+    // not come for, the choice here applies if on.
+    var frameInterpolationStreamerChoice: Bool = true
     
     init() {}
     
@@ -98,6 +123,13 @@ struct GlobalSettings: Codable {
         self.videoFilter = try container.decodeIfPresent(String.self, forKey: .videoFilter) ?? self.videoFilter
         self.sharpenEnabled = try container.decodeIfPresent(Bool.self, forKey: .sharpenEnabled) ?? self.sharpenEnabled
         self.sharpenStrength = try container.decodeIfPresent(Float.self, forKey: .sharpenStrength) ?? self.sharpenStrength
+        self.frameInterpolation = try container.decodeIfPresent(Bool.self, forKey: .frameInterpolation) ?? self.frameInterpolation
+        self.useServerMotion = try container.decodeIfPresent(Bool.self, forKey: .useServerMotion) ?? self.useServerMotion
+        self.frameInterpolationBlend = try container.decodeIfPresent(Bool.self, forKey: .frameInterpolationBlend) ?? self.frameInterpolationBlend
+        self.frameInterpolationSelect = try container.decodeIfPresent(Bool.self, forKey: .frameInterpolationSelect) ?? self.frameInterpolationSelect
+        self.frameInterpolationSelectCandidates = try container.decodeIfPresent(Float.self, forKey: .frameInterpolationSelectCandidates) ?? self.frameInterpolationSelectCandidates
+        self.frameInterpolationSelectGrid = try container.decodeIfPresent(Float.self, forKey: .frameInterpolationSelectGrid) ?? self.frameInterpolationSelectGrid
+        self.frameInterpolationStreamerChoice = try container.decodeIfPresent(Bool.self, forKey: .frameInterpolationStreamerChoice) ?? self.frameInterpolationStreamerChoice
     }
 }
 

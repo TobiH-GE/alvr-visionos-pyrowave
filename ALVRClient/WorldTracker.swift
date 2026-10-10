@@ -2606,6 +2606,9 @@ class WorldTracker {
         // selected that option
         let transform = self.worldTrackingSteamVRTransform.inverse * appleOriginFromAnchor
         let transformLastRefetched = self.worldTrackingSteamVRTransform.inverse * appleOriginFromAnchorLastRefetched
+        // The head pose for this timestamp before the client core's prediction (FramePoseHistory
+        // prefers the predicted one the streamer got; this is the fallback).
+        FramePoseHistory.shared.record(timestampNs: reportedTargetTimestampNS, orientation: simd_quaternion(transform))
         let leftTransform = transform * viewTransforms[0]
         let rightTransform = transform * viewTransforms[1]
         
