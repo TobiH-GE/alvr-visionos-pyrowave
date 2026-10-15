@@ -27,6 +27,7 @@ typedef NS_ENUM(EnumBackingType, BufferIndex)
     BufferIndexEncodingUniforms = 4,
     BufferIndexVRR = 5,
     BufferIndexFrameExtrapolation = 6,
+    BufferIndexSplitEyes = 7,
 };
 
 typedef NS_ENUM(EnumBackingType, VertexAttribute)
@@ -77,7 +78,11 @@ typedef struct
     int gridRows;
     int iterations;          // fixed point iterations inverting the field
     int blendPrevious;       // 1: the previous frame is bound (textures 3, 4) and the field's pair;
-                             // 2: as 1, with the motion chosen per block at texture 5
+                             // 2: as 1, with the motion chosen per block at texture 5;
+                             // 3: the newer frame moved along the choice only; 4 (Apple's private
+                             // formats): the in-between made ahead (fxPrecomputeInBetween) at texture 7;
+                             // 5: the frame moved forward by alpha along the NEXT frame's field
+                             // ("Predict with Streamer Vectors")
 } FrameExtrapolationUniform;
 
 // "Choose motion per pixel": picture pixels per block of the choice (fxSelectMotion).

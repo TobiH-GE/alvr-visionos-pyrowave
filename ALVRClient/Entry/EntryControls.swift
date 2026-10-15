@@ -24,13 +24,29 @@ struct EntryControls: View {
         
         HStack(spacing: 17) {
             if eventHandler.connectionState == .connected {
+                // Search the streamer again over the USB Ethernet adapter only, or over Wi-Fi only.
                 Button {
-                    eventHandler.rescan()
+                    eventHandler.rescan(.wired)
                 } label: {
-                    Label("Rescan", systemImage: "arrow.clockwise")
-                        .labelStyle(.titleAndIcon)
-                        .padding(15)
+                    HStack(spacing: 8) {
+                        Text("Rescan")
+                        Image(systemName: "cable.connector.horizontal")
+                    }
+                    .padding(15)
                 }
+                .help("Search the streamer over the USB Ethernet adapter only")
+                .disabled(model.isShowingClient || eventHandler.rescanning)
+
+                Button {
+                    eventHandler.rescan(.wifi)
+                } label: {
+                    HStack(spacing: 8) {
+                        Text("Rescan")
+                        Image(systemName: "wifi")
+                    }
+                    .padding(15)
+                }
+                .help("Search the streamer over Wi-Fi only")
                 .disabled(model.isShowingClient || eventHandler.rescanning)
 
                 Toggle(isOn: $model.isShowingClient) {

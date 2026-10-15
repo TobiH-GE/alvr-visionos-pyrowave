@@ -151,6 +151,8 @@ class Renderer {
     var frameInterpolationPrevious: QueuedFrame? = nil
     var frameInterpolationBlendWith: QueuedFrame? = nil
     var frameInterpolationSelection: MTLTexture? = nil
+    // The in-between made ahead for this display (mode 4), if any.
+    var frameInterpolationPrecomputed: MTLTexture? = nil
 
     // The luma plane of a PyroWave frame (10 bit in 16 bit containers) as a Metal texture.
     func makeLumaTexture(_ pixelBuffer: CVPixelBuffer) -> CVMetalTexture? {
@@ -241,6 +243,7 @@ class Renderer {
         
         self.device = layerRenderer?.device ?? MTLCreateSystemDefaultDevice()!
         self.commandQueue = self.device.makeCommandQueue()!
+        FrameExtrapolation.renderQueue = self.commandQueue
 
         let uniformBufferSize = alignedUniformsSize * maxBuffersInFlight
         self.dynamicUniformBuffer = self.device.makeBuffer(length:uniformBufferSize,
@@ -787,10 +790,11 @@ class Renderer {
         }
         let startPollTime = CACurrentMediaTime()
         var pickedFromQueue = false
-        // Client setting "frame interpolation": a new PyroWave frame is only taken once its motion
-        // is known (at most a display period later), so its first display can be the in-between.
+        // Client setting "frame interpolation": a new frame (PyroWave or VideoToolbox) is only taken
+        // once its motion is known (at most a display period later), so its first display can be
+        // the in-between.
         let holdBackFor: FrameExtrapolation? = ALVRClientApp.gStore.settings.frameInterpolation && EventHandler.shared.lastQueuedFrame != nil
-            ? EventHandler.shared.pyroWaveDecoder?.frameExtrapolation : nil
+            ? EventHandler.shared.frameExtrapolation : nil
         while true {
             sched_yield()
             
@@ -899,7 +903,7 @@ class Renderer {
         
         if queuedFrame != nil && !queuedFrame!.viewParamsValid /*&& EventHandler.shared.lastSubmittedTimestamp != queuedFrame!.timestamp*/ {
             alvr_report_compositor_start(queuedFrame!.timestamp, nalViewsPtr)
-            queuedFrame = QueuedFrame(imageBuffer: queuedFrame!.imageBuffer, timestamp: queuedFrame!.timestamp, viewParamsValid: true, viewParams: [nalViewsPtr[0], nalViewsPtr[1]])
+            queuedFrame = QueuedFrame(imageBuffer: queuedFrame!.imageBuffer, timestamp: queuedFrame!.timestamp, viewParamsValid: true, viewParams: [nalViewsPtr[0], nalViewsPtr[1]], rightImageBuffer: queuedFrame!.rightImageBuffer)
         }
 
         if EventHandler.shared.alvrInitialized && streamingActiveForFrame {
@@ -1050,17 +1054,19 @@ class Renderer {
         
         let deviceAnchor = WorldTracker.shared.worldTracking.queryDeviceAnchor(atTimestamp: vsyncTime)
 
-        // Client setting "Frame Interpolation" (GlobalSettings.frameInterpolation): a slower PyroWave
-        // stream (45 fps on 90 Hz) gets in-between frames. See FrameExtrapolation.swift.
+        // Client setting "Frame Interpolation" (GlobalSettings.frameInterpolation): a slower stream
+        // (45 fps on 90 Hz) gets in-between frames, PyroWave as well as HEVC, H.264 and AV1 with the
+        // streamer's motion vectors. See FrameExtrapolation.swift.
         frameExtrapolationState = nil
         frameInterpolationBlendWith = nil
         frameInterpolationSelection = nil
+        frameInterpolationPrecomputed = nil
         let frameInterpolation = ALVRClientApp.gStore.settings.frameInterpolation
         if frameInterpolation,
-           let frameExtrapolation = EventHandler.shared.pyroWaveDecoder?.frameExtrapolation {
+           let frameExtrapolation = EventHandler.shared.frameExtrapolation {
             frameExtrapolation.noteDisplay(vsync: vsyncTime)
             frameExtrapolation.setViewGeometry(FrameExtrapolation.ViewGeometry(tangents: EventHandler.shared.sentViewTangents))
-            if let queuedFrame, PyroWaveDecoder.isPyroWaveFrame(queuedFrame.imageBuffer) {
+            if let queuedFrame {
                 if queuedFrame.timestamp != frameInterpolationShown?.timestamp {
                     frameInterpolationPrevious = frameInterpolationShown
                     frameInterpolationShown = queuedFrame
@@ -1072,9 +1078,17 @@ class Renderer {
                 let select = ALVRClientApp.gStore.settings.frameInterpolationSelect
                 let streamerChoice = ALVRClientApp.gStore.settings.frameInterpolationStreamerChoice
                     && ALVRClientApp.gStore.settings.useServerMotion
-                if frameInterpolation, blend || select || streamerChoice, uniform.alpha < 0,
-                   let previous = frameInterpolationPrevious, previous.timestamp == previousTimestamp {
-                    if blend {
+                // The choices apply in both directions: back on a frame's first display (alpha < 0) and
+                // forward on a late frame's repeat (alpha > 0). The repeat used to follow the raw
+                // vectors, which smear text, on 13-20 % of the frames over Wi-Fi (2026-10-12).
+                // Mode 5 (predicting along the next frame's field) takes none of them.
+                if frameInterpolation, blend || select || streamerChoice, uniform.alpha != 0, uniform.blendPrevious != 5 {
+                    // Only blending needs the previous frame itself, and only going back; the choices
+                    // do not. They used to wait for it as well, so a frame whose predecessor was never
+                    // shown here (dropped from the queue, frequent over Wi-Fi) followed the raw vectors.
+                    let previous = frameInterpolationPrevious.flatMap { $0.timestamp == previousTimestamp ? $0 : nil }
+                    let blendWithPrevious = blend && previous != nil && uniform.alpha < 0
+                    if blendWithPrevious {
                         uniform.blendPrevious = 1
                         frameInterpolationBlendWith = previous
                     }
@@ -1088,15 +1102,30 @@ class Renderer {
                     if streamerChoice,
                        let choice = frameExtrapolation.streamerChoice(timestamp: queuedFrame.timestamp,
                                                                       previousTimestamp: previousTimestamp) {
-                        uniform.blendPrevious = blend ? 2 : 3
+                        uniform.blendPrevious = blendWithPrevious ? 2 : 3
                         frameInterpolationSelection = choice
                     } else if select,
                        let selection = frameExtrapolation.selection(commandBuffer: commandBuffer, field: texture,
                                                                     timestamp: queuedFrame.timestamp,
                                                                     previousTimestamp: previousTimestamp) {
-                        uniform.blendPrevious = blend ? 2 : 3
+                        uniform.blendPrevious = blendWithPrevious ? 2 : 3
                         frameInterpolationSelection = selection
+                    } else if streamerChoice, !blendWithPrevious,
+                              frameExtrapolation.streamerSendsChoice(near: queuedFrame.timestamp) {
+                        // The streamer makes choices, but this frame's did not arrive (lost over Wi-Fi):
+                        // shown as decoded rather than moved along the raw vectors, which smear text.
+                        uniform.alpha = 0
                     }
+                }
+                // The in-between made ahead for this pair (FrameExtrapolation.tryPrecompute): only
+                // sampled then, which takes the interpolation out of this display's render.
+                if uniform.alpha < 0, uniform.blendPrevious == 1 || uniform.blendPrevious == 2,
+                   let previous = frameInterpolationBlendWith,
+                   let made = frameExtrapolation.precomputedInBetween(timestamp: queuedFrame.timestamp,
+                                                                      previousTimestamp: previous.timestamp,
+                                                                      alpha: uniform.alpha, mode: uniform.blendPrevious) {
+                    uniform.blendPrevious = 4
+                    frameInterpolationPrecomputed = made
                 }
                 frameExtrapolationState = (texture, uniform)
             }
@@ -1226,9 +1255,17 @@ class Renderer {
                 }
             }
             
+            // Debug capture of the finished picture (Documents/display_trigger, see DisplayRecorder).
+            DisplayRecorder.shared.capture(commandBuffer: commandBuffer, drawable: drawable, vsync: vsyncTime,
+                                           frameTimestamp: queuedFrame?.timestamp ?? 0, newFrame: pickedFromQueue,
+                                           alpha: frameExtrapolationState?.1.alpha ?? 0,
+                                           mode: frameExtrapolationState?.1.blendPrevious ?? 0,
+                                           choice: frameInterpolationSelection != nil,
+                                           field: frameExtrapolationState?.0, selection: frameInterpolationSelection,
+                                           headNow: deviceAnchor.map { simd_quatf($0.originFromAnchorTransform) })
             drawable.encodePresent(commandBuffer: commandBuffer)
         }
-        
+
         coolPulsingColorsTime += 0.005
         if coolPulsingColorsTime > 4.0 {
             coolPulsingColorsTime = 0.0
@@ -1249,10 +1286,15 @@ class Renderer {
             let diagDeadline = LayerRenderer.Clock.Instant.epoch.duration(to: mainDrawable.frameTiming.renderingDeadline).timeInterval
             let diagPresent = LayerRenderer.Clock.Instant.epoch.duration(to: mainDrawable.frameTiming.presentationTime).timeInterval
             let diagNewFrame = queuedFrame != nil && !isReprojected
+            let diagKind = GpuSplitDiag.kind(alpha: frameExtrapolationState?.1.alpha ?? 0,
+                                             mode: frameExtrapolationState?.1.blendPrevious ?? 0,
+                                             newFrame: pickedFromQueue)
             commandBuffer.addCompletedHandler { cb in
                 let diagDone = CACurrentMediaTime()
                 LateFramePickup.shared.record(work: diagDone - diagPickTime, missedDeadline: diagDone > diagDeadline,
                                               active: lateFramePickup)
+                GpuSplitDiag.shared.recordRender(kind: diagKind, gpuStart: cb.gpuStartTime, gpuEnd: cb.gpuEndTime,
+                                                 missedDeadline: diagDone > diagDeadline)
                 if FrameTimingDiag.enabled {
                     FrameTimingDiag.shared.record(optimal: diagOptimal, deadline: diagDeadline, present: diagPresent,
                                                   wake: diagWakeTime, pick: diagPickTime, commit: diagCommitTime,
@@ -1962,10 +2004,48 @@ class Renderer {
             renderEncoder.setFragmentTexture(metalTexture, index: i)
             boundTextures.append(metalTexture)
         }
-        // Frame interpolation from both frames: the previous frame's planes at 3 and 4; otherwise the
-        // current ones again, since the shader declares them.
+        // Eyes encoded separately (streamer setting "Encode eyes separately"): the right eye's half
+        // at texture 6, and the shader picks the texture per eye. Apple's private formats only, which
+        // VideoToolbox gives for H.264/HEVC here; the shader for the others does not split.
+        var splitEyes: Int32 = 0
+        if let right = queuedFrame.rightImageBuffer, VideoHandler.isFormatSecret(format, allowSecret: allowSecret) {
+            var textureOut: CVMetalTexture?
+            if CVMetalTextureCacheCreateTextureFromImage(nil, metalTextureCache, right, nil, textureTypes[0],
+                                                         CVPixelBufferGetWidthOfPlane(right, 0), CVPixelBufferGetHeightOfPlane(right, 0),
+                                                         0, &textureOut) == kCVReturnSuccess,
+               let textureOut, let texture = CVMetalTextureGetTexture(textureOut) {
+                renderEncoder.setFragmentTexture(texture, index: 6)
+                splitEyes = 1
+            }
+        }
+        if splitEyes == 0, let first = boundTextures.first {
+            // The shader declares it; never read then.
+            renderEncoder.setFragmentTexture(first, index: 6)
+        }
+        renderEncoder.setFragmentBytes(&splitEyes, length: MemoryLayout<Int32>.size, index: BufferIndex.splitEyes.rawValue)
+        // Frame interpolation from both frames: the previous frame's planes at 3 and 4, or with
+        // Apple's private formats its one texture at 3 and its right half's at 4 (the same again
+        // when the eyes are not split); otherwise the current ones again, since the shader declares
+        // them.
         var previousTextures: [MTLTexture] = []
-        if let previous = frameInterpolationBlendWith {
+        if let previous = frameInterpolationBlendWith, VideoHandler.isFormatSecret(format, allowSecret: allowSecret) {
+            let buffers: [CVImageBuffer?] = splitEyes != 0 ? [previous.imageBuffer, previous.rightImageBuffer] : [previous.imageBuffer]
+            for buffer in buffers {
+                var textureOut: CVMetalTexture?
+                guard let buffer,
+                      CVMetalTextureCacheCreateTextureFromImage(nil, metalTextureCache, buffer, nil, textureTypes[0],
+                                                                CVPixelBufferGetWidthOfPlane(buffer, 0), CVPixelBufferGetHeightOfPlane(buffer, 0),
+                                                                0, &textureOut) == kCVReturnSuccess,
+                      let textureOut, let texture = CVMetalTextureGetTexture(textureOut) else {
+                    previousTextures = []
+                    break
+                }
+                previousTextures.append(texture)
+            }
+            if previousTextures.count == 1 {
+                previousTextures.append(previousTextures[0])
+            }
+        } else if let previous = frameInterpolationBlendWith {
             for i in 0...1 where i < textureTypes.count && textureTypes[i] != .invalid {
                 var textureOut: CVMetalTexture?
                 let buffer = previous.imageBuffer
@@ -1982,8 +2062,14 @@ class Renderer {
             renderEncoder.setFragmentTexture(texture, index: 3 + i)
         }
         // Modes 1 and 2 read the previous frame; mode 3 (chosen motion, newer frame only) does not.
+        // Without the previous frame's textures mode 2 keeps the chosen motion as mode 3, mode 1 the
+        // plain move.
         if previousTextures.count != 2, let mode = frameExtrapolationState?.1.blendPrevious, mode == 1 || mode == 2 {
-            frameExtrapolationState?.1.blendPrevious = 0
+            frameExtrapolationState?.1.blendPrevious = mode == 2 ? 3 : 0
+        }
+        // The in-between made ahead (mode 4, private formats' shader), or a stand-in it never reads.
+        if let made = frameInterpolationPrecomputed ?? boundTextures.first {
+            renderEncoder.setFragmentTexture(made, index: 7)
         }
         if let selection = frameInterpolationSelection ?? frameExtrapolationIdleTexture {
             renderEncoder.setFragmentTexture(selection, index: 5)
@@ -2089,6 +2175,87 @@ class Renderer {
 // frame later would show a fresher one -- this measures how much slack there actually is before
 // anything changes. Averages over 450 frames (~5 s at 90 Hz) go to the console (stdout), prefixed "frame timing".
 // Measurement only: nothing here changes when frames are picked or presented.
+// Diagnosis (2026-10-14): where the render GPU time goes per kind of display, and whether the slow
+// ones (the deadline misses come from single GPU runs of 12-16 ms, while the average is 4-5 ms)
+// coincide with the frame interpolation's own GPU work on its queue. Logged every 450 displays.
+final class GpuSplitDiag {
+    static let shared = GpuSplitDiag()
+    static let kindNames = ["in-between blend", "in-between move", "new frame", "repeat", "in-between made ahead", "predicted"]
+    private static let slowSeconds = 0.008
+
+    private let lock = NSLock()
+    private var count = [Int](repeating: 0, count: GpuSplitDiag.kindNames.count)
+    private var sum = [Double](repeating: 0, count: GpuSplitDiag.kindNames.count)
+    private var maxGpu = [Double](repeating: 0, count: GpuSplitDiag.kindNames.count)
+    private var missed = [Int](repeating: 0, count: GpuSplitDiag.kindNames.count)
+    private var slow = [Int](repeating: 0, count: GpuSplitDiag.kindNames.count)
+    private var displays = 0
+    // GPU intervals of the slow renders and of the interpolation's own work, for the overlap.
+    private var slowIntervals: [(start: Double, end: Double)] = []
+    private var fxIntervals: [(start: Double, end: Double)] = []
+    private var fxSum = 0.0
+    private var fxMax = 0.0
+
+    // alpha and mode as the display's FrameExtrapolationUniform had them (0 without interpolation).
+    static func kind(alpha: Float, mode: Int32, newFrame: Bool) -> Int {
+        if alpha < 0 && mode == 4 { return 4 }
+        if alpha > 0 && mode == 5 { return 5 }
+        if alpha < 0 && (mode == 1 || mode == 2) { return 0 }
+        if alpha != 0 { return 1 }
+        return newFrame ? 2 : 3
+    }
+
+    func recordFx(start: Double, end: Double) {
+        guard end > start else { return }
+        lock.withLock {
+            fxIntervals.append((start, end))
+            fxSum += end - start
+            fxMax = max(fxMax, end - start)
+        }
+    }
+
+    func recordRender(kind: Int, gpuStart: Double, gpuEnd: Double, missedDeadline: Bool) {
+        let gpu = max(gpuEnd - gpuStart, 0)
+        var line: String?
+        lock.withLock {
+            count[kind] += 1
+            sum[kind] += gpu
+            maxGpu[kind] = max(maxGpu[kind], gpu)
+            if missedDeadline { missed[kind] += 1 }
+            if gpu > Self.slowSeconds {
+                slow[kind] += 1
+                slowIntervals.append((gpuStart, gpuEnd))
+            }
+            displays += 1
+            guard displays >= 450 else { return }
+            var parts: [String] = []
+            for k in 0..<Self.kindNames.count where count[k] > 0 {
+                parts.append(String(format: "%@ %d: avg %.2f max %.2f, missed %d, over 8 ms %d",
+                                    Self.kindNames[k], count[k], sum[k] / Double(count[k]) * 1000, maxGpu[k] * 1000,
+                                    missed[k], slow[k]))
+            }
+            let overlapping = slowIntervals.filter { s in fxIntervals.contains { $0.start < s.end && s.start < $0.end } }.count
+            parts.append(String(format: "interpolation's own GPU work %d runs, avg %.2f max %.2f ms; slow renders overlapping it %d of %d",
+                                fxIntervals.count, fxIntervals.isEmpty ? 0 : fxSum / Double(fxIntervals.count) * 1000,
+                                fxMax * 1000, overlapping, slowIntervals.count))
+            line = "GPU split (ms): " + parts.joined(separator: " | ")
+            count = [Int](repeating: 0, count: Self.kindNames.count)
+            sum = [Double](repeating: 0, count: Self.kindNames.count)
+            maxGpu = [Double](repeating: 0, count: Self.kindNames.count)
+            missed = [Int](repeating: 0, count: Self.kindNames.count)
+            slow = [Int](repeating: 0, count: Self.kindNames.count)
+            displays = 0
+            slowIntervals.removeAll()
+            fxIntervals.removeAll()
+            fxSum = 0
+            fxMax = 0
+        }
+        if let line {
+            pyroLog(line)
+        }
+    }
+}
+
 final class FrameTimingDiag {
     static let enabled = true
     static let shared = FrameTimingDiag()

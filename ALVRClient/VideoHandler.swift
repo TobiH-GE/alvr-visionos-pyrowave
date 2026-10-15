@@ -167,6 +167,19 @@ struct VideoHandler {
         //    //pixelFormat = isFullRange ? kCVPixelFormatType_420YpCbCr10PackedBiPlanarFullRange : kCVPixelFormatType_420YpCbCr10PackedBiPlanarVideoRange // default
         //}
         
+        guard let decompressionSession = makeDecompressionSession(videoFormat: videoFormat!) else {
+            return (nil, nil)
+        }
+
+        // Optimize display for 24P film viewing if selected
+        VideoHandler.applyRefreshRate(videoFormat: videoFormat)
+
+        return (decompressionSession, videoFormat!)
+    }
+
+    // A hardware decoder for this format. Also the second one for the right eye's half, when the
+    // streamer encodes the eyes separately (both halves share the format).
+    static func makeDecompressionSession(videoFormat: CMFormatDescription) -> VTDecompressionSession? {
         let videoDecoderSpecification:[NSString: AnyObject] = [kVTVideoDecoderSpecification_EnableHardwareAcceleratedVideoDecoder:kCFBooleanTrue]
         let destinationImageBufferAttributes:[NSString: AnyObject] = [kCVPixelBufferMetalCompatibilityKey: true as NSNumber, kCVPixelBufferPoolMinimumBufferCountKey: 3 as NSNumber]
         // TODO come back to this maybe idk
@@ -175,21 +188,15 @@ struct VideoHandler {
         //}
 
         var decompressionSession:VTDecompressionSession? = nil
-        err = VTDecompressionSessionCreate(allocator: nil, formatDescription: videoFormat!, decoderSpecification: videoDecoderSpecification as CFDictionary, imageBufferAttributes: destinationImageBufferAttributes as CFDictionary, outputCallback: nil, decompressionSessionOut: &decompressionSession)
+        let err = VTDecompressionSessionCreate(allocator: nil, formatDescription: videoFormat, decoderSpecification: videoDecoderSpecification as CFDictionary, imageBufferAttributes: destinationImageBufferAttributes as CFDictionary, outputCallback: nil, decompressionSessionOut: &decompressionSession)
         if err != 0 {
             print("VTDecompressionSessionCreate err?! \(err)")
-            return (nil, nil)
+            return nil
         }
-        
-        // Optimize display for 24P film viewing if selected
-        VideoHandler.applyRefreshRate(videoFormat: videoFormat)
-        
         if decompressionSession == nil {
             print("no session??")
-            return (nil, nil)
         }
-        
-        return (decompressionSession!, videoFormat!)
+        return decompressionSession
     }
     
     // MARK: - CMFormatDescription parsing/gymnastics
@@ -589,7 +596,8 @@ struct VideoHandler {
     
     // MARK: - Actually feed the NALs/OBUs into the decoder
     
-    static func feedVideoIntoDecoder(decompressionSession: VTDecompressionSession, nals: UnsafeMutableBufferPointer<UInt8>, timestamp: UInt64, videoFormat: CMFormatDescription, codec: Int, callback: @escaping (_ imageBuffer: CVImageBuffer?) -> Void) {
+    // status: the decode result as VideoToolbox reports it, before callback (decoder health).
+    static func feedVideoIntoDecoder(decompressionSession: VTDecompressionSession, nals: UnsafeMutableBufferPointer<UInt8>, timestamp: UInt64, videoFormat: CMFormatDescription, codec: Int, status statusCallback: ((OSStatus) -> Void)? = nil, callback: @escaping (_ imageBuffer: CVImageBuffer?) -> Void) {
         var err:OSStatus = 0
         guard let sampleBuffer =
             (codec == ALVR_CODEC_AV1.rawValue) ?
@@ -617,9 +625,11 @@ struct VideoHandler {
                 //alvr_report_fatal_decoder_error("VideoToolbox decoder failed with status: \(status)")
             }
 
+            statusCallback?(status < 0 || imageBuffer == nil ? min(status, -1) : 0)
             callback(imageBuffer)
         }
         if err != 0 {
+            statusCallback?(err)
             //fatalError("VTDecompressionSessionDecodeFrame")
         }
     }

@@ -374,9 +374,19 @@ struct Entry: View {
                             saveAction()
                         }
 
+                        Toggle(isOn: $gStore.settings.smoothHeadPrediction) {
+                            Text("Smooth Head Prediction")
+                            Text("Filters the head's rotation and movement speed before the pose is predicted ahead for the streamer: strongly while the head is still or slow, hardly during fast turns. Removes the jitter of the predicted pose that makes view-fixed content (HUD, menus) and the in-between frames restless.")
+                                .font(.system(size: 10))
+                        }
+                        .toggleStyle(.switch)
+                        .onChange(of: gStore.settings.smoothHeadPrediction) {
+                            saveAction()
+                        }
+
                         Toggle(isOn: $gStore.settings.frameInterpolation) {
                             Text("Frame Interpolation")
-                            Text("When the stream runs slower than the display (45 fps at 90 Hz, 50 fps at 100 Hz), every second display shows an in-between frame, made once the next frame has arrived from the motion between the two: one display period (~11 ms) more latency for motion in the scene, head turns stay as fast as before. PyroWave, Metal renderer only.")
+                            Text("When the stream runs slower than the display (45 fps at 90 Hz, 50 fps at 100 Hz), every second display shows an in-between frame, made once the next frame has arrived from the motion between the two: one display period (~11 ms) more latency for motion in the scene, head turns stay as fast as before. PyroWave, and HEVC, H.264 or AV1 with the streamer's motion vectors (NVENC); Metal renderer only.")
                                 .font(.system(size: 10))
                         }
                         .toggleStyle(.switch)
@@ -386,11 +396,21 @@ struct Entry: View {
 
                         Toggle(isOn: $gStore.settings.useServerMotion) {
                             Text("Interpolation: Use Server Motion Vectors")
-                            Text("Takes the motion from the vectors the streamer sends (its setting \"Send motion vectors\", NVIDIA Optical Flow on the original frames). Off: the motion is estimated on the headset's GPU from the PyroWave picture.")
+                            Text("Takes the motion from the vectors the streamer sends (its setting \"Send motion vectors\", NVIDIA Optical Flow on the original frames). Off: the motion is estimated on the headset's GPU from the PyroWave picture (PyroWave only; HEVC, H.264 and AV1 always need the streamer's vectors).")
                                 .font(.system(size: 10))
                         }
                         .toggleStyle(.switch)
                         .onChange(of: gStore.settings.useServerMotion) {
+                            saveAction()
+                        }
+
+                        Toggle(isOn: $gStore.settings.frameInterpolationPredict) {
+                            Text("Interpolation: Predict with Streamer Vectors")
+                            Text("Shows each new frame at once, without the display period of extra latency, and its repeat as the frame moved forward along the motion to the next frame, which the streamer's vectors bring before that frame arrives (about 6 ms ahead with HEVC, 3-4 ms with PyroWave). Areas that only the next frame shows cannot be filled. Needs Use Server Motion Vectors.")
+                                .font(.system(size: 10))
+                        }
+                        .toggleStyle(.switch)
+                        .onChange(of: gStore.settings.frameInterpolationPredict) {
                             saveAction()
                         }
 

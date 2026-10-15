@@ -87,7 +87,16 @@ struct GlobalSettings: Codable {
     // (its setting "Send motion choice") instead of choosing on the headset's GPU. For frames it has
     // not come for, the choice here applies if on.
     var frameInterpolationStreamerChoice: Bool = true
-    
+    // Frame interpolation: show each new frame at once (no display period of extra latency) and
+    // its repeat as the frame moved forward along the next frame's motion, which the streamer's
+    // vectors bring ahead of that frame (2026-10-15: 5-7 ms ahead with HEVC). Without them in time,
+    // the repeat is extrapolated along the frame's own motion as before.
+    var frameInterpolationPredict: Bool = false
+    // Filters the head's velocities before the client core predicts the pose with them (up to 90 ms
+    // ahead): the raw ones, differences of two poses ~11 ms apart, made the predicted pose jitter
+    // 0.03-0.08 deg per frame with the head still, 3-5 times the head's own (2026-10-12).
+    var smoothHeadPrediction: Bool = true
+
     init() {}
     
     init(from decoder: Decoder) throws {
@@ -130,6 +139,8 @@ struct GlobalSettings: Codable {
         self.frameInterpolationSelectCandidates = try container.decodeIfPresent(Float.self, forKey: .frameInterpolationSelectCandidates) ?? self.frameInterpolationSelectCandidates
         self.frameInterpolationSelectGrid = try container.decodeIfPresent(Float.self, forKey: .frameInterpolationSelectGrid) ?? self.frameInterpolationSelectGrid
         self.frameInterpolationStreamerChoice = try container.decodeIfPresent(Bool.self, forKey: .frameInterpolationStreamerChoice) ?? self.frameInterpolationStreamerChoice
+        self.smoothHeadPrediction = try container.decodeIfPresent(Bool.self, forKey: .smoothHeadPrediction) ?? self.smoothHeadPrediction
+        self.frameInterpolationPredict = try container.decodeIfPresent(Bool.self, forKey: .frameInterpolationPredict) ?? self.frameInterpolationPredict
     }
 }
 

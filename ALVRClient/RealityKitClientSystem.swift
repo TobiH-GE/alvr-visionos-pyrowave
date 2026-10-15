@@ -1529,7 +1529,7 @@ class RealityKitClientSystemCorrectlyAssociated : System {
             defer { nalViewsPtr.deallocate() }
             alvr_report_compositor_start(queuedFrame!.timestamp, nalViewsPtr)
 
-            queuedFrame = QueuedFrame(imageBuffer: queuedFrame!.imageBuffer, timestamp: queuedFrame!.timestamp, viewParamsValid: true, viewParams: [nalViewsPtr[0], nalViewsPtr[1]])
+            queuedFrame = QueuedFrame(imageBuffer: queuedFrame!.imageBuffer, timestamp: queuedFrame!.timestamp, viewParamsValid: true, viewParams: [nalViewsPtr[0], nalViewsPtr[1]], rightImageBuffer: queuedFrame!.rightImageBuffer)
         }
 
         //print(queuedFrame, EventHandler.shared.alvrInitialized, streamingActiveForFrame)

@@ -466,6 +466,9 @@ class WorldTracker {
     var lastSkeletonRight:[AlvrPose]? = nil
     var lastHeadPose: AlvrPose? = nil
     var lastHeadTimestamp: Double = 0.0
+    // Setting "Smooth Head Prediction".
+    var headAngularSmoother = VelocitySmoother(minCutoffHz: 1.0, cutoffPerUnit: 4.0)
+    var headLinearSmoother = VelocitySmoother(minCutoffHz: 1.0, cutoffPerUnit: 20.0)
     
     var leftControllerAnchor: Any? = nil
     var leftControllerPose: simd_float4x4? = nil
@@ -3316,6 +3319,10 @@ class WorldTracker {
             }
             headLinVel = (dp.0 / dt, dp.1 / dt, dp.2 / dt)
             headAngVel = angularVelocityBetweenQuats(lastPose.orientation, pose.orientation, dt)
+            if ALVRClientApp.gStore.settings.smoothHeadPrediction {
+                headAngVel = headAngularSmoother.filter(headAngVel, dt: dt)
+                headLinVel = headLinearSmoother.filter(headLinVel, dt: dt)
+            }
         }
         lastHeadPose = headPose
         lastHeadTimestamp = targetTimestampWalkedBack
@@ -3527,6 +3534,39 @@ class WorldTracker {
         print("Sending fake tracking...")
     }
     
+    // Adaptive low pass for a velocity (the "One Euro" idea, here on the velocity itself): its cutoff
+    // rises with the smoothed speed, minCutoffHz + cutoffPerUnit * |v|, so a still or slow head is
+    // smoothed strongly (1 Hz) and a fast turn hardly (angular: 5 Hz at 1 rad/s, 13 Hz at 3 rad/s).
+    // A step to rest decays within ~0.2 s, so the prediction does not overshoot for long.
+    struct VelocitySmoother {
+        let minCutoffHz: Float
+        let cutoffPerUnit: Float
+        private var value = SIMD3<Float>(0, 0, 0)
+        private var primed = false
+
+        init(minCutoffHz: Float, cutoffPerUnit: Float) {
+            self.minCutoffHz = minCutoffHz
+            self.cutoffPerUnit = cutoffPerUnit
+        }
+
+        mutating func filter(_ v: (Float, Float, Float), dt: Float) -> (Float, Float, Float) {
+            let raw = SIMD3<Float>(v.0, v.1, v.2)
+            guard raw.x.isFinite, raw.y.isFinite, raw.z.isFinite else {
+                return (value.x, value.y, value.z)
+            }
+            if !primed || dt <= 0 || dt > 0.1 {
+                primed = true
+                value = raw
+            } else {
+                let speed = max(simd_length(value), simd_length(raw))
+                let cutoff = minCutoffHz + cutoffPerUnit * speed
+                let alpha = 1 / (1 + 1 / (2 * Float.pi * cutoff * dt))
+                value += alpha * (raw - value)
+            }
+            return (value.x, value.y, value.z)
+        }
+    }
+
     func angularVelocityBetweenQuats(_ q1: AlvrQuat, _ q2: AlvrQuat, _ dt: Float) -> (Float, Float, Float) {
         let r = (2.0 / dt)
         return (

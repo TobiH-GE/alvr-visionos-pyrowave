@@ -14,6 +14,7 @@
 import Foundation
 import Metal
 import VideoToolbox
+import os
 import Combine
 import AVKit
 import Foundation
@@ -129,9 +130,25 @@ class EventHandler: ObservableObject {
     
     var inputRunning = false
     var vtDecompressionSession:VTDecompressionSession? = nil
+    // Streamer setting "Encode eyes separately": the right half's decoder; the left half uses
+    // vtDecompressionSession. splitEyes once such halves arrive.
+    var vtDecompressionSessionRight: VTDecompressionSession? = nil
+    var splitEyes = false
     // Used instead of vtDecompressionSession when the stream is PyroWave.
     var pyroWaveDecoder: PyroWaveDecoder? = nil
     var lastPyroWaveTimestamp: UInt64 = 0
+    // Frame interpolation for VideoToolbox streams (HEVC, H.264, AV1): made with the first motion
+    // packet once the stream's size is known. PyroWave streams have their decoder's.
+    var videoFrameExtrapolation: FrameExtrapolation? = nil
+    // The frames that began arriving last and the one before it, for the streamer's motion vectors.
+    var lastVideoFrameTimestamp: UInt64 = 0
+    var previousVideoFrameTimestamp: UInt64 = 0
+    var frameExtrapolation: FrameExtrapolation? {
+        pyroWaveDecoder?.frameExtrapolation ?? videoFrameExtrapolation
+    }
+    // The frame decoded last (under frameQueueLock), the previous one for the in-between made
+    // ahead of the next (FrameExtrapolation.noteDecoded).
+    private var lastDecodedFrame: QueuedFrame?
     var lastForcedResetTimestamp: UInt64 = 0
     var videoFormat:CMFormatDescription? = nil
     var currentCodec: Int = -1
@@ -241,6 +258,11 @@ class EventHandler: ObservableObject {
         streamingActive = false
         vtDecompressionSession = nil
         pyroWaveDecoder = nil
+        vtDecompressionSessionRight = nil
+        splitEyes = false
+        videoFrameExtrapolation = nil
+        lastVideoFrameTimestamp = 0
+        previousVideoFrameTimestamp = 0
         videoFormat = nil
         lastRequestedTimestamp = 0
         lastSubmittedTimestamp = 0
@@ -472,11 +494,33 @@ class EventHandler: ObservableObject {
             return true
         }
 
+        // The streamer's motion vectors and motion choice (FrameMotion.h there): extra packets with
+        // the frame's timestamp, ahead of the frame, marked by 0xffff in their first two bytes (no
+        // start code or OBU header begins so). Never for VideoToolbox.
+        let packet = UnsafeRawBufferPointer(start: frameData.buffer_ptr, count: Int(frameData.buffer_size))
+        if packet.count >= 2, packet[0] == 0xff, packet[1] == 0xff {
+            receiveVideoMotion(packet: packet, timestamp: timestamp)
+            return true
+        }
+        if timestamp != lastVideoFrameTimestamp {
+            previousVideoFrameTimestamp = lastVideoFrameTimestamp
+            lastVideoFrameTimestamp = timestamp
+        }
+
         if ALVRClientApp.gStore.settings.showPerformanceHud {
             PerformanceTracker.shared.recordReceive(timestampNs: timestamp)
         }
-        let nal = UnsafeMutableBufferPointer<UInt8>(start: UnsafeMutablePointer(mutating: frameData.buffer_ptr), count: Int(frameData.buffer_size))
-        
+        var nal = UnsafeMutableBufferPointer<UInt8>(start: UnsafeMutablePointer(mutating: frameData.buffer_ptr), count: Int(frameData.buffer_size))
+        // Streamer setting "Encode eyes separately" (NVENC, H.264/HEVC): each eye's half comes as a
+        // packet of its own behind 0xff 0xfe 0x00 <eye>, the left one first; each is decoded the
+        // moment it is in, on a decoder of its own, and the frame is queued once both are done.
+        var eye = -1
+        if nal.count > 4, nal[0] == 0xff, nal[1] == 0xfe, nal[2] == 0, nal[3] < 2 {
+            eye = Int(nal[3])
+            nal = UnsafeMutableBufferPointer(rebasing: nal[4...])
+            splitEyes = true
+        }
+
         objc_sync_enter(self.frameQueueLock)
         self.framesSinceLastIDR += 1
 
@@ -533,12 +577,61 @@ class EventHandler: ObservableObject {
             }
         }
 
+        // A decoder session that only fails (VideoToolbox can invalidate one, -12903) is never
+        // replaced otherwise: the picture then froze for good while packets kept coming (app
+        // "hung", 2026-10-15). After 10 failures in a row the session is made anew and an IDR asked.
+        let side = max(eye, 0)
+        if decoderHealth.withLock({ $0.consecutiveFailures[side] >= 10 }), let videoFormat {
+            let lastStatus = decoderHealth.withLock { h in
+                defer { h.consecutiveFailures[side] = 0 }
+                return h.lastFailure[side]
+            }
+            pyroLog("Decoder \(eye == 1 ? "right" : eye == 0 ? "left" : "") failed 10 times in a row (last status \(lastStatus)): new decoder session, IDR requested")
+            if eye == 1 {
+                if let session = vtDecompressionSessionRight { VTDecompressionSessionInvalidate(session) }
+                vtDecompressionSessionRight = VideoHandler.makeDecompressionSession(videoFormat: videoFormat)
+            } else {
+                if let session = vtDecompressionSession { VTDecompressionSessionInvalidate(session) }
+                vtDecompressionSession = VideoHandler.makeDecompressionSession(videoFormat: videoFormat)
+            }
+            return false
+        }
+        let decodeStatus: (OSStatus) -> Void = { [self] status in
+            decoderHealth.withLock { h in
+                h.decoded[side] += 1
+                if status < 0 {
+                    h.failed[side] += 1
+                    h.consecutiveFailures[side] += 1
+                    h.lastFailure[side] = status
+                } else {
+                    h.consecutiveFailures[side] = 0
+                }
+            }
+        }
+        decoderHealth.withLock { $0.fed[side] += 1 }
+        logIfNoNewFrame()
+
         let frameDecoded: (CVImageBuffer?) -> Void = { [self] imageBuffer in
-            queueDecodedFrame(imageBuffer, timestamp: timestamp, startedDecodeTime: startedDecodeTime, lagNs: ns_diff_from_last_req_ts)
+            if eye >= 0 {
+                receiveDecodedHalf(imageBuffer, eye: eye, timestamp: timestamp, startedDecodeTime: startedDecodeTime, lagNs: ns_diff_from_last_req_ts)
+            } else {
+                queueDecodedFrame(imageBuffer, timestamp: timestamp, startedDecodeTime: startedDecodeTime, lagNs: ns_diff_from_last_req_ts)
+            }
+        }
+
+        if eye == 1 {
+            // The right half: a second decoder for the same format, made with its first packet.
+            if vtDecompressionSessionRight == nil, let videoFormat {
+                vtDecompressionSessionRight = VideoHandler.makeDecompressionSession(videoFormat: videoFormat)
+            }
+            if let session = vtDecompressionSessionRight, let videoFormat {
+                VideoHandler.feedVideoIntoDecoder(decompressionSession: session, nals: nal, timestamp: timestamp, videoFormat: videoFormat, codec: currentCodec, status: decodeStatus, callback: frameDecoded)
+            }
+            return retVal
         }
 
         if let vtDecompressionSession = self.vtDecompressionSession {
-            VideoHandler.feedVideoIntoDecoder(decompressionSession: vtDecompressionSession, nals: nal, timestamp: timestamp, videoFormat: self.videoFormat!, codec: currentCodec, callback: frameDecoded)
+            VideoHandler.feedVideoIntoDecoder(decompressionSession: vtDecompressionSession, nals: nal, timestamp: timestamp, videoFormat: self.videoFormat!, codec: currentCodec, status: decodeStatus, callback: frameDecoded)
         } else {
             // No decoder yet: asking for the decoder config once per frame is enough. PyroWave
             // sends thousands of packets per frame, each of which would otherwise ask again.
@@ -572,9 +665,98 @@ class EventHandler: ObservableObject {
         return retVal
     }
     
+    // A motion packet of a VideoToolbox stream (network thread, like handleNals). The motion of a
+    // frame arrives ahead of it, so the frame before it is the one that began last; a packet that
+    // comes after its frame (the streamer had to send the frame first) takes the one before that.
+    private func receiveVideoMotion(packet: UnsafeRawBufferPointer, timestamp: UInt64) {
+        let settings = ALVRClientApp.gStore.settings
+        guard settings.frameInterpolation, settings.useServerMotion, let videoFormat else {
+            return
+        }
+        // The vectors cover the whole frame; with the eyes encoded separately the format is one half.
+        var size = CMVideoFormatDescriptionGetDimensions(videoFormat)
+        if splitEyes {
+            size.width *= 2
+        }
+        if videoFrameExtrapolation == nil || videoFrameExtrapolationSize.width != size.width || videoFrameExtrapolationSize.height != size.height {
+            videoFrameExtrapolationSize = size
+            videoFrameExtrapolation = MTLCreateSystemDefaultDevice().flatMap {
+                FrameExtrapolation(device: $0, width: Int(size.width), height: Int(size.height))
+            }
+        }
+        let previous = timestamp == lastVideoFrameTimestamp ? previousVideoFrameTimestamp : lastVideoFrameTimestamp
+        videoFrameExtrapolation?.receiveServerMotion(packet: packet, timestamp: timestamp, previousFrame: previous)
+    }
+    private var videoFrameExtrapolationSize = CMVideoDimensions(width: 0, height: 0)
+
+    // One eye's decoded half (VideoToolbox callback threads). The frame goes to the queue once
+    // both halves of it are in; a half of an older frame than the one being collected is dropped.
+    private func receiveDecodedHalf(_ imageBuffer: CVImageBuffer?, eye: Int, timestamp: UInt64, startedDecodeTime: Double, lagNs: UInt64) {
+        guard let imageBuffer else { return }
+        let pair: (CVImageBuffer, CVImageBuffer, Double)? = halvesLock.withLock {
+            if timestamp < pendingHalves.timestamp {
+                return nil
+            }
+            if timestamp != pendingHalves.timestamp {
+                pendingHalves = (timestamp, nil, nil, startedDecodeTime)
+            }
+            if eye == 0 {
+                pendingHalves.left = imageBuffer
+                pendingHalves.started = startedDecodeTime
+            } else {
+                pendingHalves.right = imageBuffer
+            }
+            guard let left = pendingHalves.left, let right = pendingHalves.right else {
+                return nil
+            }
+            let started = pendingHalves.started
+            pendingHalves = (timestamp, nil, nil, 0)
+            return (left, right, started)
+        }
+        if let (left, right, started) = pair {
+            queueDecodedFrame(left, timestamp: timestamp, startedDecodeTime: started, lagNs: lagNs, rightImageBuffer: right)
+        }
+    }
+    private let halvesLock = NSLock()
+
+    // VideoToolbox decoder health per eye (index 0 also for an undivided frame), for the stall log
+    // and the replacement of a failing session in handleNals.
+    struct DecoderHealth {
+        var fed = [0, 0]
+        var decoded = [0, 0]
+        var failed = [0, 0]
+        var consecutiveFailures = [0, 0]
+        var lastFailure: [OSStatus] = [0, 0]
+    }
+    let decoderHealth = OSAllocatedUnfairLock(initialState: DecoderHealth())
+    private var stallLogged = false
+
+    // Network thread, per video packet: once per stall, when packets keep coming but no new frame
+    // has been queued for a second, what the decoders and the pairing of the halves are doing.
+    private func logIfNoNewFrame() {
+        let since = CACurrentMediaTime() - timeLastFrameDecoded
+        guard timeLastFrameDecoded > 0, since > 1.0 else {
+            stallLogged = false
+            return
+        }
+        guard !stallLogged else { return }
+        stallLogged = true
+        let h = decoderHealth.withLock { $0 }
+        let halves = halvesLock.withLock { pendingHalves }
+        let queued = objc_sync_enter(frameQueueLock) == 0 ? frameQueue.count : -1
+        objc_sync_exit(frameQueueLock)
+        pyroLog(String(format: "No new frame for %.1f s while packets arrive: fed L %ld R %ld, decoded L %ld R %ld, failed L %ld R %ld (in a row L %ld R %ld, last status L %d R %d), halves waiting for %llu (left %@, right %@), newest packet %llu, queue %ld, split %@",
+                       since, h.fed[0], h.fed[1], h.decoded[0], h.decoded[1], h.failed[0], h.failed[1],
+                       h.consecutiveFailures[0], h.consecutiveFailures[1], h.lastFailure[0], h.lastFailure[1],
+                       halves.timestamp, halves.left != nil ? "in" : "missing", halves.right != nil ? "in" : "missing",
+                       lastVideoFrameTimestamp, queued, splitEyes ? "yes" : "no"))
+    }
+    private var pendingHalves: (timestamp: UInt64, left: CVImageBuffer?, right: CVImageBuffer?, started: Double) = (0, nil, nil, 0)
+
     // Queues a decoded frame for the renderer. Called by the VideoToolbox callback and by the
-    // PyroWave decoder, on their own threads.
-    func queueDecodedFrame(_ imageBuffer: CVImageBuffer?, timestamp: UInt64, startedDecodeTime: Double, lagNs: UInt64) {
+    // PyroWave decoder, on their own threads. rightImageBuffer: the right eye's half when the eyes
+    // are encoded separately (imageBuffer is the left one then).
+    func queueDecodedFrame(_ imageBuffer: CVImageBuffer?, timestamp: UInt64, startedDecodeTime: Double, lagNs: UInt64, rightImageBuffer: CVImageBuffer? = nil) {
         guard let imageBuffer = imageBuffer else {
             //print("Frame not decoded")
             return
@@ -616,10 +798,10 @@ class EventHandler: ObservableObject {
             // the next frame is starting, so keep this around for now just in case.
             if frameQueueLastImageBuffer != nil {
                 //frameQueue.append(QueuedFrame(imageBuffer: frameQueueLastImageBuffer!, timestamp: frameQueueLastTimestamp))
-                frameQueue.append(QueuedFrame(imageBuffer: imageBuffer, timestamp: timestamp, viewParamsValid: false, viewParams: viewParamsDummy, queuedTime: CACurrentMediaTime()))
+                frameQueue.append(QueuedFrame(imageBuffer: imageBuffer, timestamp: timestamp, viewParamsValid: false, viewParams: viewParamsDummy, queuedTime: CACurrentMediaTime(), rightImageBuffer: rightImageBuffer))
             }
             else {
-                frameQueue.append(QueuedFrame(imageBuffer: imageBuffer, timestamp: timestamp, viewParamsValid: false, viewParams: viewParamsDummy, queuedTime: CACurrentMediaTime()))
+                frameQueue.append(QueuedFrame(imageBuffer: imageBuffer, timestamp: timestamp, viewParamsValid: false, viewParams: viewParamsDummy, queuedTime: CACurrentMediaTime(), rightImageBuffer: rightImageBuffer))
             }
             // TODO: make this configurable
             if frameQueue.count > 2 {
@@ -636,8 +818,19 @@ class EventHandler: ObservableObject {
         if frameQueueLastTimestamp == timestamp {
             frameQueueLastImageBuffer = imageBuffer
         }
+        var decoded: (frame: QueuedFrame, previous: QueuedFrame?)?
+        if let last = frameQueue.last, last.timestamp == timestamp, last.timestamp != lastDecodedFrame?.timestamp {
+            decoded = (last, lastDecodedFrame)
+            lastDecodedFrame = last
+        }
 
         objc_sync_exit(frameQueueLock)
+        if ALVRClientApp.gStore.settings.frameInterpolation && ALVRClientApp.gStore.settings.useServerMotion {
+            MotionTimingDiag.shared.note(.frameDecoded, timestamp: timestamp)
+        }
+        if let decoded {
+            frameExtrapolation?.noteDecoded(decoded.frame, previous: decoded.previous)
+        }
         //print("End VT callback")
     }
     
@@ -744,11 +937,19 @@ class EventHandler: ObservableObject {
         }
     }
 
-    func rescan() {
+    // Where a rescan searches (alvr_set_announce_interfaces): the "Rescan" buttons with the LAN and
+    // the Wi-Fi symbol. Until the first rescan the core searches wired first, then Wi-Fi too.
+    enum RescanInterfaces: UInt8 {
+        case wired = 1
+        case wifi = 2
+    }
+
+    func rescan(_ interfaces: RescanInterfaces) {
         guard alvrInitialized, !rescanning else { return }
         rescanning = true
         DispatchQueue.global(qos: .userInitiated).async {
-            pyroLog("Rescan: pausing the client core")
+            alvr_set_announce_interfaces(interfaces.rawValue)
+            pyroLog("Rescan (\(interfaces == .wired ? "LAN only" : "Wi-Fi only")): pausing the client core")
             alvr_pause()
             Thread.sleep(forTimeInterval: 1.0)
             alvr_resume()
@@ -1103,4 +1304,7 @@ struct QueuedFrame {
     // CACurrentMediaTime() when the decoded frame was queued (0 if unknown), for the renderer's
     // frame buffering measurement (TrackingSendPhase).
     var queuedTime: Double = 0
+    // The right eye's half, when the streamer encodes the eyes separately (imageBuffer is the
+    // left one then).
+    var rightImageBuffer: CVImageBuffer? = nil
 }

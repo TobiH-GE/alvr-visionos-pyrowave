@@ -547,6 +547,26 @@ static float4 frameInterpolationField(texture2d<float> motion, constant FrameExt
     return motion.sample(linearSampler, float2(gx, gy) / grid);
 }
 
+// "Predict with Streamer Vectors" (mode 5): where the frame shown (n) is sampled so that it looks
+// fx.alpha of the way to the next frame (n+1), in its own view, along the next frame's field. That
+// field lives in n+1's picture: a point c there was at c - f.ba - f.rg in n (.ba the head rotation,
+// .rg the scene motion). With head rotation left to the reprojection, the content at y in the
+// prediction came from p = y - alpha * rg(c) in n, where c = p + ba(c) + rg(c) = y + ba(c) +
+// (1 - alpha) * rg(c), found by fixed point iteration.
+static float2 frameInterpolationPredictCoord(texture2d<float> motion, constant FrameExtrapolationUniform &fx, float2 uv) {
+    const float2 y = uv * fx.frameSize;
+    const float eyeWidth = fx.frameSize.x * 0.5;
+    const int eye = y.x >= eyeWidth ? 1 : 0;
+    const float2 lo = float2(float(eye) * eyeWidth + 0.5, 0.5);
+    const float2 hi = float2(float(eye + 1) * eyeWidth - 0.5, fx.frameSize.y - 0.5);
+    const float t = fx.alpha;
+    float4 f = frameInterpolationField(motion, fx, y, eye);
+    for (int i = 0; i < 2; i++) {
+        f = frameInterpolationField(motion, fx, y + f.ba + (1.0 - t) * f.rg, eye);
+    }
+    return clamp(y - t * f.rg, lo, hi) / fx.frameSize;
+}
+
 // Frame interpolation from both frames (setting "Interpolation: Blend Both Frames"), after the
 // approach of OFXR Bridge's frame_synthesis.hlsl (ideas only, no code): the in-between at uv is the
 // newer frame moved back and the previous frame moved forward along the scene motion, mixed by how
@@ -567,42 +587,50 @@ static half4 frameInterpolationBlend(texture2d<float> motion, constant FrameExtr
     const float a = -fx.alpha;
 
     // Still: the same picture in both frames once head rotation is mapped out, here and 2 pixels
-    // to either side (text runs horizontally; a moving edge can cross a flat centre).
-    const float2 rotationHere = frameInterpolationField(motion, fx, y, eye).ba;
-    bool still = true;
-    for (int i = -1; i <= 1; i++) {
-        const float2 p = y + float2(2.0 * float(i), 0.0);
-        const float c = float(curY.sample(linearSampler, clamp(p, lo, hi) / fx.frameSize).r);
-        const float q = float(prevY.sample(linearSampler, clamp(p - rotationHere, lo, hi) / fx.frameSize).r);
-        if (abs(c - q) > 3.0 / 255.0) {
-            still = false;
+    // to either side (text runs horizontally; a moving edge can cross a flat centre), and no
+    // scene motion in the field here. Without the field's say a thin line moving ~20 px was torn
+    // apart: at the place it belongs in the in-between both frames are flat and agree (seen on
+    // streamer dumps, 2026-10-13). The field sample is the one read for the rotation anyway.
+    //
+    // Kept cheap as measured on streamer dumps against the real middle frame (2026-10-15): one
+    // still tap at the centre, one iteration less with the field read here as its first step, no
+    // extra field read at the end, and the fallback read only where it is used, keep the quality
+    // (within 0.03 dB) at 30-40 % fewer video and 50-60 % fewer field samples; confidence x3
+    // instead of x6 was 0.05-1 dB better.
+    const float4 fieldHere = frameInterpolationField(motion, fx, y, eye);
+    const float2 rotationHere = fieldHere.ba;
+    const float2 yPrev = clamp(y - rotationHere, lo, hi);
+    if (abs(fieldHere.r) + abs(fieldHere.g) < 0.75) {
+        const float c = float(curY.sample(linearSampler, uv).r);
+        const float q = float(prevY.sample(linearSampler, yPrev / fx.frameSize).r);
+        if (abs(c - q) <= 3.0 / 255.0) {
+            return sampleVideoFrame(curY, curUV, colorSampler, uv);
         }
-    }
-    if (still) {
-        return sampleVideoFrame(curY, curUV, colorSampler, uv);
     }
 
     // Where the content seen at y is in the newer frame (x) and in the previous one.
-    float2 x = y;
-    for (int i = 0; i < fx.iterations; i++) {
-        x = y + a * frameInterpolationField(motion, fx, x, eye).rg;
+    float4 f = fieldHere;
+    float2 x = y + a * f.rg;
+    for (int i = 2; i < fx.iterations; i++) {
+        f = frameInterpolationField(motion, fx, x, eye);
+        x = y + a * f.rg;
     }
-    const float4 f = frameInterpolationField(motion, fx, x, eye);
     const float2 xCur = clamp(x, lo, hi);
     const float2 xPrev = clamp(x - f.ba - f.rg, lo, hi);
     const half4 cur = sampleVideoFrame(curY, curUV, colorSampler, xCur / fx.frameSize);
     const half4 prev = half4(prevY.sample(linearSampler, xPrev / fx.frameSize).r,
                              prevUV.sample(linearSampler, xPrev / fx.frameSize).rg, 1.0h);
     const half4 moved = mix(cur, prev, half(a));
+    const half confidence = saturate(1.0h - abs(cur.r - prev.r) * 3.0h);
+    if (confidence >= 1.0h) {
+        return moved;
+    }
 
     // The fallback: both frames without scene motion, mixed.
-    const float2 yPrev = clamp(y - rotationHere, lo, hi);
     const half4 curStill = half4(curY.sample(linearSampler, uv).r, curUV.sample(linearSampler, uv).rg, 1.0h);
     const half4 prevStill = half4(prevY.sample(linearSampler, yPrev / fx.frameSize).r,
                                   prevUV.sample(linearSampler, yPrev / fx.frameSize).rg, 1.0h);
     const half4 stable = mix(curStill, prevStill, half(a));
-
-    const half confidence = saturate(1.0h - abs(cur.r - prev.r) * 6.0h);
     return mix(stable, moved, confidence);
 }
 
@@ -685,9 +713,11 @@ fragment half4 videoFrameFragmentShader_YpCbCrBiPlanar(ColorInOut in [[stage_in]
                                    min_filter::linear,
                                    address::clamp_to_edge);
     half4 ycbcr;
-    if (fx.alpha < 0.0f && fx.blendPrevious == 2) {
+    if (fx.alpha > 0.0f && fx.blendPrevious == 5) {
+        ycbcr = sampleVideoFrame(in_tex_y, in_tex_uv, colorSampler, frameInterpolationPredictCoord(fxMotion, fx, sampleCoord));
+    } else if (fx.alpha < 0.0f && fx.blendPrevious == 2) {
         ycbcr = frameInterpolationSelected(fxMotion, fxSelected, fx, sampleCoord, in_tex_y, in_tex_uv, prev_tex_y, prev_tex_uv, colorSampler);
-    } else if (fx.alpha < 0.0f && fx.blendPrevious == 3) {
+    } else if (fx.alpha != 0.0f && fx.blendPrevious == 3) {
         ycbcr = sampleVideoFrame(in_tex_y, in_tex_uv, colorSampler, frameInterpolationSelectedCoord(fxMotion, fxSelected, fx, sampleCoord));
     } else if (fx.alpha < 0.0f && fx.blendPrevious != 0) {
         ycbcr = frameInterpolationBlend(fxMotion, fx, sampleCoord, in_tex_y, in_tex_uv, prev_tex_y, prev_tex_uv, colorSampler);
@@ -711,25 +741,176 @@ fragment half4 videoFrameFragmentShader_YpCbCrBiPlanar(ColorInOut in [[stage_in]
     return videoFrameFragmentShader_common(color);
 }
 
-fragment half4 videoFrameFragmentShader_SecretYpCbCrFormats(ColorInOut in [[stage_in]], texture2d<half> in_tex_y) {
-    
+// Apple's private formats (VideoToolbox frames): one texture per frame, or per eye's half with
+// "Encode eyes separately" (right != left), sampled as linear RGB; a filter at the eye boundary
+// only ever sees its own eye.
+static half3 sampleSecret(texture2d<half> left, texture2d<half> right, bool split, sampler s, float2 uv) {
+    if (split) {
+        const bool r = uv.x >= 0.5;
+        const float2 local = float2((uv.x - (r ? 0.5 : 0.0)) * 2.0, uv.y);
+        return (r ? sampleVideo(right, s, local) : sampleVideo(left, s, local)).rgb;
+    }
+    return sampleVideo(left, s, uv).rgb;
+}
+
+// Luma for the comparisons of the blend: of the linear RGB these formats give, square-rooted so
+// that its thresholds mean about what they mean on the gamma encoded planes of frameInterpolationBlend.
+static half secretLuma(half3 c) {
+    return sqrt(max(dot(c, half3(0.2126h, 0.7152h, 0.0722h)), 0.0h));
+}
+
+// frameInterpolationBlend for the private formats: the same in-between of both frames (still test
+// with the field's say, motion back and forward, confidence, fallback without scene motion), on
+// their RGB.
+static half3 frameInterpolationBlendSecret(texture2d<float> motion, constant FrameExtrapolationUniform &fx, float2 uv,
+                                           texture2d<half> curL, texture2d<half> curR,
+                                           texture2d<half> prevL, texture2d<half> prevR, bool split, sampler colorSampler) {
+    const float2 y = uv * fx.frameSize;
+    const float eyeWidth = fx.frameSize.x * 0.5;
+    const int eye = y.x >= eyeWidth ? 1 : 0;
+    const float2 lo = float2(float(eye) * eyeWidth + 0.5, 0.5);
+    const float2 hi = float2(float(eye + 1) * eyeWidth - 0.5, fx.frameSize.y - 0.5);
+    const float a = -fx.alpha;
+
+    // The same reduced sampling as frameInterpolationBlend (measured on streamer dumps there).
+    const float4 fieldHere = frameInterpolationField(motion, fx, y, eye);
+    const float2 rotationHere = fieldHere.ba;
+    const float2 yPrev = clamp(y - rotationHere, lo, hi);
+    if (abs(fieldHere.r) + abs(fieldHere.g) < 0.75) {
+        const half3 curHere = sampleSecret(curL, curR, split, colorSampler, uv);
+        const half q = secretLuma(sampleSecret(prevL, prevR, split, colorSampler, yPrev / fx.frameSize));
+        if (abs(secretLuma(curHere) - q) <= 3.0h / 255.0h) {
+            return curHere;
+        }
+    }
+
+    float4 f = fieldHere;
+    float2 x = y + a * f.rg;
+    for (int i = 2; i < fx.iterations; i++) {
+        f = frameInterpolationField(motion, fx, x, eye);
+        x = y + a * f.rg;
+    }
+    const float2 xCur = clamp(x, lo, hi);
+    const float2 xPrev = clamp(x - f.ba - f.rg, lo, hi);
+    const half3 cur = sampleSecret(curL, curR, split, colorSampler, xCur / fx.frameSize);
+    const half3 prev = sampleSecret(prevL, prevR, split, colorSampler, xPrev / fx.frameSize);
+    const half3 moved = mix(cur, prev, half(a));
+    const half confidence = saturate(1.0h - abs(secretLuma(cur) - secretLuma(prev)) * 3.0h);
+    if (confidence >= 1.0h) {
+        return moved;
+    }
+
+    const half3 stable = mix(sampleSecret(curL, curR, split, colorSampler, uv),
+                             sampleSecret(prevL, prevR, split, colorSampler, yPrev / fx.frameSize), half(a));
+    return mix(stable, moved, confidence);
+}
+
+// frameInterpolationSelected for the private formats: choice 0 (the streamer's field) is the
+// blend above, the others both frames along the chosen motion, mixed.
+static half3 frameInterpolationSelectedSecret(texture2d<float> motion, texture2d<float> selected, constant FrameExtrapolationUniform &fx,
+                                              float2 uv, texture2d<half> curL, texture2d<half> curR,
+                                              texture2d<half> prevL, texture2d<half> prevR, bool split, sampler colorSampler) {
+    const float2 y = uv * fx.frameSize;
+    const uint2 cell = min(uint2(y / float(FX_SELECT_BLOCK)), uint2(selected.get_width() - 1, selected.get_height() - 1));
+    const int chosen = int(selected.read(cell).r + 0.5);
+    if (chosen == 0) {
+        return frameInterpolationBlendSecret(motion, fx, uv, curL, curR, prevL, prevR, split, colorSampler);
+    }
+    const float eyeWidth = fx.frameSize.x * 0.5;
+    const int eye = y.x >= eyeWidth ? 1 : 0;
+    const float2 lo = float2(float(eye) * eyeWidth + 0.5, 0.5);
+    const float2 hi = float2(float(eye + 1) * eyeWidth - 0.5, fx.frameSize.y - 0.5);
+    const float a = -fx.alpha;
+    const float2 rotation = frameInterpolationField(motion, fx, y, eye).ba;
+    const float c = fx.cellPixels;
+    const float2 offset = chosen == 3 ? float2(-c, 0) : chosen == 4 ? float2(c, 0) : chosen == 5 ? float2(0, -c) : float2(0, c);
+    const float2 t = chosen == 1 ? rotation
+                   : chosen == 2 ? float2(0.0)
+                   : frameInterpolationField(motion, fx, y + offset, eye).rg + rotation;
+    const float2 xCur = clamp(y + a * (t - rotation), lo, hi);
+    const float2 xPrev = clamp(xCur - t, lo, hi);
+    return mix(sampleSecret(curL, curR, split, colorSampler, xCur / fx.frameSize),
+               sampleSecret(prevL, prevR, split, colorSampler, xPrev / fx.frameSize), half(a));
+}
+
+// The in-between of a frame and the one before it, made ahead on the render queue as soon as the
+// frame, its field and its choice are there (FrameExtrapolation.tryPrecompute), at the alpha of its
+// first display. The display then only samples it (mode 4): interpolating in the render pass cost
+// the in-between displays 7-7.7 ms of GPU against 2-3 for the others, and most deadline misses
+// (2026-10-14). Stream space, as the render pass samples it; sqrt-encoded linear RGB in 10 bits.
+kernel void fxPrecomputeInBetween(texture2d<half> curL [[texture(0)]],
+                                  texture2d<half> curR [[texture(1)]],
+                                  texture2d<half> prevL [[texture(2)]],
+                                  texture2d<half> prevR [[texture(3)]],
+                                  texture2d<float> motion [[texture(4)]],
+                                  texture2d<float> selected [[texture(5)]],
+                                  texture2d<half, access::write> out [[texture(6)]],
+                                  constant FrameExtrapolationUniform &fx [[buffer(0)]],
+                                  constant int &splitEyes [[buffer(1)]],
+                                  uint2 gid [[thread_position_in_grid]]) {
+    if (gid.x >= out.get_width() || gid.y >= out.get_height()) {
+        return;
+    }
+    constexpr sampler colorSampler(mip_filter::none, mag_filter::linear, min_filter::linear, address::clamp_to_edge);
+    const float2 uv = (float2(gid) + 0.5) / float2(out.get_width(), out.get_height());
+    const bool split = splitEyes != 0;
+    const half3 c = fx.blendPrevious == 2
+        ? frameInterpolationSelectedSecret(motion, selected, fx, uv, curL, curR, prevL, prevR, split, colorSampler)
+        : frameInterpolationBlendSecret(motion, fx, uv, curL, curR, prevL, prevR, split, colorSampler);
+    out.write(half4(sqrt(max(c, half3(0.0h))), 1.0h), gid);
+}
+
+fragment half4 videoFrameFragmentShader_SecretYpCbCrFormats(ColorInOut in [[stage_in]], texture2d<half> in_tex_y [[texture(0)]],
+                                                           texture2d<float> fxMotion [[texture(2)]],
+                                                           texture2d<half> prev_tex [[texture(3)]],
+                                                           texture2d<half> prev_right_tex [[texture(4)]],
+                                                           texture2d<float> fxSelected [[texture(5)]],
+                                                           texture2d<half> right_tex_y [[texture(6)]],
+                                                           texture2d<half> precomputed [[texture(7)]],
+                                                           constant FrameExtrapolationUniform &fx [[buffer(BufferIndexFrameExtrapolation)]],
+                                                           constant int &splitEyes [[buffer(BufferIndexSplitEyes)]]) {
+
     float2 sampleCoord;
     if (FFR_ENABLED) {
         sampleCoord = decompressAxisAlignedCoord(in.texCoord);
     } else {
         sampleCoord = in.texCoord;
     }
-    
+
     constexpr sampler colorSampler(mip_filter::none,
                                    mag_filter::linear,
                                    min_filter::linear,
                                    address::clamp_to_edge);
-    
+
+    // Frame interpolation for VideoToolbox frames (HEVC, H.264, AV1): with Blend Both Frames the
+    // in-between of both frames (the previous one's texture at 3, its right half at 4), with the
+    // streamer's choice per block (mode 2) or the field as a whole (mode 1); otherwise the newer
+    // frame moved back along the choice (mode 3) or the field.
+    const bool split = splitEyes != 0;
+    if (fx.alpha < 0.0f && fx.blendPrevious == 4) {
+        // Made ahead by fxPrecomputeInBetween.
+        const half3 c = precomputed.sample(colorSampler, sampleCoord).rgb;
+        return videoFrameFragmentShader_common(c * c);
+    }
+    if (fx.alpha < 0.0f && fx.blendPrevious == 2) {
+        return videoFrameFragmentShader_common(frameInterpolationSelectedSecret(
+            fxMotion, fxSelected, fx, sampleCoord, in_tex_y, right_tex_y, prev_tex, prev_right_tex, split, colorSampler));
+    }
+    if (fx.alpha < 0.0f && fx.blendPrevious == 1) {
+        return videoFrameFragmentShader_common(frameInterpolationBlendSecret(
+            fxMotion, fx, sampleCoord, in_tex_y, right_tex_y, prev_tex, prev_right_tex, split, colorSampler));
+    }
+    if (fx.alpha > 0.0f && fx.blendPrevious == 5) {
+        sampleCoord = frameInterpolationPredictCoord(fxMotion, fx, sampleCoord);
+    } else if (fx.alpha != 0.0f && fx.blendPrevious == 3) {
+        sampleCoord = frameInterpolationSelectedCoord(fxMotion, fxSelected, fx, sampleCoord);
+    } else if (fx.alpha != 0.0f) {
+        sampleCoord = frameExtrapolationCoord(fxMotion, fx, sampleCoord);
+    }
+
     // Apple's private formats sample as RGB, so sharpening would need a luma of its own; only the
     // bicubic filter applies here, and the FSR setting falls back to it.
-    half3 color = sampleVideo(in_tex_y, colorSampler, sampleCoord).rgb;
-    
-    return videoFrameFragmentShader_common(color);
+    return videoFrameFragmentShader_common(sampleSecret(in_tex_y, right_tex_y, split, colorSampler, sampleCoord));
 }
 
 // PyroWave decodes Y, Cb and Cr into separate planes, while the video pipeline samples biplanar
