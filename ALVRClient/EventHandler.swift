@@ -260,6 +260,7 @@ class EventHandler: ObservableObject {
         pyroWaveDecoder = nil
         vtDecompressionSessionRight = nil
         splitEyes = false
+        multiviewLogged = false
         videoFrameExtrapolation = nil
         lastVideoFrameTimestamp = 0
         previousVideoFrameTimestamp = 0
@@ -611,11 +612,16 @@ class EventHandler: ObservableObject {
         decoderHealth.withLock { $0.fed[side] += 1 }
         logIfNoNewFrame()
 
-        let frameDecoded: (CVImageBuffer?) -> Void = { [self] imageBuffer in
+        let frameDecoded: (CVImageBuffer?, CVImageBuffer?) -> Void = { [self] imageBuffer, rightImageBuffer in
             if eye >= 0 {
                 receiveDecodedHalf(imageBuffer, eye: eye, timestamp: timestamp, startedDecodeTime: startedDecodeTime, lagNs: ns_diff_from_last_req_ts)
             } else {
-                queueDecodedFrame(imageBuffer, timestamp: timestamp, startedDecodeTime: startedDecodeTime, lagNs: ns_diff_from_last_req_ts)
+                // MV-HEVC: both views at once, drawn as with the eyes encoded separately.
+                if let rightImageBuffer {
+                    noteMultiviewFrame(imageBuffer, rightImageBuffer)
+                }
+                queueDecodedFrame(imageBuffer, timestamp: timestamp, startedDecodeTime: startedDecodeTime, lagNs: ns_diff_from_last_req_ts,
+                                  rightImageBuffer: rightImageBuffer)
             }
         }
 
@@ -718,6 +724,19 @@ class EventHandler: ObservableObject {
         }
     }
     private let halvesLock = NSLock()
+
+    // MV-HEVC frames are two views like the separately encoded halves (splitEyes: the motion
+    // vectors then cover twice the format's width). Logged once per stream with the views' pixel
+    // format: the renderer draws two views only from Apple's private formats.
+    private var multiviewLogged = false
+    private func noteMultiviewFrame(_ left: CVImageBuffer?, _ right: CVImageBuffer) {
+        splitEyes = true
+        guard !multiviewLogged else { return }
+        multiviewLogged = true
+        let format = CVPixelBufferGetPixelFormatType(right)
+        let name = VideoHandler.coreVideoPixelFormatToStr[format] ?? String(format: "0x%08x", format)
+        pyroLog("MV-HEVC: both views decoded, \(CVPixelBufferGetWidth(right))x\(CVPixelBufferGetHeight(right)) \(name), left view \(left != nil ? "in" : "missing")")
+    }
 
     // VideoToolbox decoder health per eye (index 0 also for an undivided frame), for the stall log
     // and the replacement of a failing session in handleNals.

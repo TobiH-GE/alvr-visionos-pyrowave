@@ -177,6 +177,32 @@ struct VideoHandler {
         return (decompressionSession, videoFormat!)
     }
 
+    // MV-HEVC (streamer setting "MV-HEVC"): the base layer's format plus an lhvC atom with the second
+    // view's SPS and PPS, so the decoder outputs both views; nil for an ordinary stream.
+    static func multiviewFormat(base: CMFormatDescription, initialNals: UnsafeMutableBufferPointer<UInt8>) -> CMFormatDescription? {
+        let layer1 = extractLayer1ParameterSets(from: initialNals)
+        guard !layer1.isEmpty, var extensions = CMFormatDescriptionGetExtensions(base) as? [String: Any],
+              var atoms = extensions["SampleDescriptionExtensionAtoms"] as? [String: Any] else {
+            return nil
+        }
+        atoms["lhvC"] = lhvCAtom(layer1Sets: layer1)
+        extensions["SampleDescriptionExtensionAtoms"] = atoms
+        let dims = CMVideoFormatDescriptionGetDimensions(base)
+        var format: CMFormatDescription?
+        let status = CMVideoFormatDescriptionCreate(allocator: nil, codecType: kCMVideoCodecType_HEVC, width: dims.width,
+                                                    height: dims.height, extensions: extensions as CFDictionary,
+                                                    formatDescriptionOut: &format)
+        pyroLog("MV-HEVC: \(layer1.count) parameter sets of the second view, format with lhvC: \(status), stereo decode supported: \(VTIsStereoMVHEVCDecodeSupported())")
+        return status == noErr ? format : nil
+    }
+
+    static func isMultiview(_ format: CMFormatDescription) -> Bool {
+        guard let atoms = (CMFormatDescriptionGetExtensions(format) as? [String: Any])?["SampleDescriptionExtensionAtoms"] as? [String: Any] else {
+            return false
+        }
+        return atoms["lhvC"] != nil
+    }
+
     // A hardware decoder for this format. Also the second one for the right eye's half, when the
     // streamer encodes the eyes separately (both halves share the format).
     static func makeDecompressionSession(videoFormat: CMFormatDescription) -> VTDecompressionSession? {
@@ -195,6 +221,12 @@ struct VideoHandler {
         }
         if decompressionSession == nil {
             print("no session??")
+        }
+        if let decompressionSession, isMultiview(videoFormat) {
+            // Both views, as tagged buffers (layer 0 the left eye, layer 1 the right).
+            let status = VTSessionSetProperty(decompressionSession, key: kVTDecompressionPropertyKey_RequestedMVHEVCVideoLayerIDs,
+                                              value: [0, 1] as CFArray)
+            pyroLog("MV-HEVC: decoder asked for views 0 and 1: \(status)")
         }
         return decompressionSession
     }
@@ -315,6 +347,7 @@ struct VideoHandler {
                     // Use the format description
                     print("Successfully created CMVideoFormatDescription.")
                     print(videoFormat!.extensions["SampleDescriptionExtensionAtoms" as NSString]!["hvcC" as NSString])
+                    videoFormat = multiviewFormat(base: videoFormat!, initialNals: initialNals) ?? videoFormat
                 } else {
                     print("Failed to create CMVideoFormatDescription. Trying fallback method...")
                     
@@ -597,7 +630,8 @@ struct VideoHandler {
     // MARK: - Actually feed the NALs/OBUs into the decoder
     
     // status: the decode result as VideoToolbox reports it, before callback (decoder health).
-    static func feedVideoIntoDecoder(decompressionSession: VTDecompressionSession, nals: UnsafeMutableBufferPointer<UInt8>, timestamp: UInt64, videoFormat: CMFormatDescription, codec: Int, status statusCallback: ((OSStatus) -> Void)? = nil, callback: @escaping (_ imageBuffer: CVImageBuffer?) -> Void) {
+    // rightImageBuffer: the second view of an MV-HEVC frame (the right eye), nil otherwise.
+    static func feedVideoIntoDecoder(decompressionSession: VTDecompressionSession, nals: UnsafeMutableBufferPointer<UInt8>, timestamp: UInt64, videoFormat: CMFormatDescription, codec: Int, status statusCallback: ((OSStatus) -> Void)? = nil, callback: @escaping (_ imageBuffer: CVImageBuffer?, _ rightImageBuffer: CVImageBuffer?) -> Void) {
         var err:OSStatus = 0
         guard let sampleBuffer =
             (codec == ALVR_CODEC_AV1.rawValue) ?
@@ -625,8 +659,20 @@ struct VideoHandler {
                 //alvr_report_fatal_decoder_error("VideoToolbox decoder failed with status: \(status)")
             }
 
-            statusCallback?(status < 0 || imageBuffer == nil ? min(status, -1) : 0)
-            callback(imageBuffer)
+            // MV-HEVC: the views come as tagged buffers, layer 0 (left eye) and layer 1 (right eye),
+            // instead of imageBuffer.
+            var image = imageBuffer
+            var right: CVImageBuffer? = nil
+            for tagged in taggedBuffers ?? [] {
+                guard case .pixelBuffer(let pixelBuffer) = tagged.buffer else { continue }
+                if tagged.tags.contains(.videoLayerID(1)) {
+                    right = pixelBuffer
+                } else if image == nil {
+                    image = pixelBuffer
+                }
+            }
+            statusCallback?(status < 0 || image == nil ? min(status, -1) : 0)
+            callback(image, right)
         }
         if err != 0 {
             statusCallback?(err)
