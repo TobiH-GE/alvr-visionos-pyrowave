@@ -56,7 +56,18 @@ struct Registers
     int2 resolution;
     float2 inv_resolution;
     int2 tile_offset; // ALVR: first threadgroup of a partial dispatch
+    int output_step; // ALVR: output column x * output_step + output_offset (alvr_output_coord)
+    int output_offset;
 };
+
+// ALVR: two planes in one texture, interleaved per column (Cb and Cr of a biplanar pixel
+// buffer, the texture seen as one 16 bit channel at twice the width): step 2, offset 0 or 1.
+// Step 1, offset 0 otherwise.
+static inline __attribute__((always_inline))
+uint2 alvr_output_coord(uint2 c, constant Registers& r)
+{
+    return uint2(c.x * uint(r.output_step) + uint(r.output_offset), c.y);
+}
 
 constant bool DCShift_tmp [[function_constant(0)]];
 constant bool DCShift = is_function_constant_defined(DCShift_tmp) ? DCShift_tmp : false;
@@ -382,8 +393,8 @@ kernel void pyrowave_idwt(constant Registers& _148 [[buffer(0)]], texture2d_arra
             {
                 v += float2(0.5);
             }
-            uOutput.write(v.xxxx, uint2((int2((2 * y) + 0, x) + (int2(32) * int2(gl_WorkGroupID.yx)))));
-            uOutput.write(v.yyyy, uint2((int2((2 * y) + 1, x) + (int2(32) * int2(gl_WorkGroupID.yx)))));
+            uOutput.write(v.xxxx, alvr_output_coord(uint2((int2((2 * y) + 0, x) + (int2(32) * int2(gl_WorkGroupID.yx)))), _148));
+            uOutput.write(v.yyyy, alvr_output_coord(uint2((int2((2 * y) + 1, x) + (int2(32) * int2(gl_WorkGroupID.yx)))), _148));
         }
     }
 }
@@ -442,7 +453,18 @@ struct Registers
     int2 resolution;
     float2 inv_resolution;
     int2 tile_offset; // ALVR: first threadgroup of a partial dispatch
+    int output_step; // ALVR: output column x * output_step + output_offset (alvr_output_coord)
+    int output_offset;
 };
+
+// ALVR: two planes in one texture, interleaved per column (Cb and Cr of a biplanar pixel
+// buffer, the texture seen as one 16 bit channel at twice the width): step 2, offset 0 or 1.
+// Step 1, offset 0 otherwise.
+static inline __attribute__((always_inline))
+uint2 alvr_output_coord(uint2 c, constant Registers& r)
+{
+    return uint2(c.x * uint(r.output_step) + uint(r.output_offset), c.y);
+}
 
 constant bool DCShift_tmp [[function_constant(0)]];
 constant bool DCShift = is_function_constant_defined(DCShift_tmp) ? DCShift_tmp : false;
@@ -768,8 +790,8 @@ kernel void pyrowave_idwt(constant Registers& _152 [[buffer(0)]], texture2d_arra
             {
                 v += float2(0.5);
             }
-            uOutput.write(v.xxxx, uint2((int2((2 * y) + 0, x) + (int2(32) * int2(gl_WorkGroupID.yx)))));
-            uOutput.write(v.yyyy, uint2((int2((2 * y) + 1, x) + (int2(32) * int2(gl_WorkGroupID.yx)))));
+            uOutput.write(v.xxxx, alvr_output_coord(uint2((int2((2 * y) + 0, x) + (int2(32) * int2(gl_WorkGroupID.yx)))), _152));
+            uOutput.write(v.yyyy, alvr_output_coord(uint2((int2((2 * y) + 1, x) + (int2(32) * int2(gl_WorkGroupID.yx)))), _152));
         }
     }
 }
@@ -828,7 +850,18 @@ struct Registers
     int2 resolution;
     float2 inv_resolution;
     int2 tile_offset; // ALVR: first threadgroup of a partial dispatch
+    int output_step; // ALVR: output column x * output_step + output_offset (alvr_output_coord)
+    int output_offset;
 };
+
+// ALVR: two planes in one texture, interleaved per column (Cb and Cr of a biplanar pixel
+// buffer, the texture seen as one 16 bit channel at twice the width): step 2, offset 0 or 1.
+// Step 1, offset 0 otherwise.
+static inline __attribute__((always_inline))
+uint2 alvr_output_coord(uint2 c, constant Registers& r)
+{
+    return uint2(c.x * uint(r.output_step) + uint(r.output_offset), c.y);
+}
 
 constant bool DCShift_tmp [[function_constant(0)]];
 constant bool DCShift = is_function_constant_defined(DCShift_tmp) ? DCShift_tmp : false;
@@ -1154,8 +1187,8 @@ kernel void pyrowave_idwt(constant Registers& _150 [[buffer(0)]], texture2d_arra
             {
                 v += half2(half(0.5));
             }
-            uOutput.write(float4(v.xxxx), uint2((int2((2 * y) + 0, x) + (int2(32) * int2(gl_WorkGroupID.yx)))));
-            uOutput.write(float4(v.yyyy), uint2((int2((2 * y) + 1, x) + (int2(32) * int2(gl_WorkGroupID.yx)))));
+            uOutput.write(float4(v.xxxx), alvr_output_coord(uint2((int2((2 * y) + 0, x) + (int2(32) * int2(gl_WorkGroupID.yx)))), _150));
+            uOutput.write(float4(v.yyyy), alvr_output_coord(uint2((int2((2 * y) + 1, x) + (int2(32) * int2(gl_WorkGroupID.yx)))), _150));
         }
     }
 }

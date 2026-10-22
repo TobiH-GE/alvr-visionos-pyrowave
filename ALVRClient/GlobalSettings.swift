@@ -87,6 +87,10 @@ struct GlobalSettings: Codable {
     // (its setting "Send motion choice") instead of choosing on the headset's GPU. For frames it has
     // not come for, the choice here applies if on.
     var frameInterpolationStreamerChoice: Bool = true
+    // Frame interpolation without Blend Both Frames: where the newer frame does not show what the
+    // in-between does (the background an object moved over, torn at its leading edge), the previous
+    // frame there.
+    var frameInterpolationFillCovered: Bool = true
     // Frame interpolation: show each new frame at once (no display period of extra latency) and
     // its repeat as the frame moved forward along the next frame's motion, which the streamer's
     // vectors bring ahead of that frame (2026-10-15: 5-7 ms ahead with HEVC). Without them in time,
@@ -139,6 +143,7 @@ struct GlobalSettings: Codable {
         self.frameInterpolationSelectCandidates = try container.decodeIfPresent(Float.self, forKey: .frameInterpolationSelectCandidates) ?? self.frameInterpolationSelectCandidates
         self.frameInterpolationSelectGrid = try container.decodeIfPresent(Float.self, forKey: .frameInterpolationSelectGrid) ?? self.frameInterpolationSelectGrid
         self.frameInterpolationStreamerChoice = try container.decodeIfPresent(Bool.self, forKey: .frameInterpolationStreamerChoice) ?? self.frameInterpolationStreamerChoice
+        self.frameInterpolationFillCovered = try container.decodeIfPresent(Bool.self, forKey: .frameInterpolationFillCovered) ?? self.frameInterpolationFillCovered
         self.smoothHeadPrediction = try container.decodeIfPresent(Bool.self, forKey: .smoothHeadPrediction) ?? self.smoothHeadPrediction
         self.frameInterpolationPredict = try container.decodeIfPresent(Bool.self, forKey: .frameInterpolationPredict) ?? self.frameInterpolationPredict
     }

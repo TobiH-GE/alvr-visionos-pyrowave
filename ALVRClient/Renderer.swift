@@ -1116,6 +1116,12 @@ class Renderer {
                         // shown as decoded rather than moved along the raw vectors, which smear text.
                         uniform.alpha = 0
                     }
+                    // Mode 3 with the previous frame bound, for what the newer frame covers (mode 6).
+                    if uniform.blendPrevious == 3, uniform.alpha < 0, let previous,
+                       ALVRClientApp.gStore.settings.frameInterpolationFillCovered {
+                        uniform.blendPrevious = 6
+                        frameInterpolationBlendWith = previous
+                    }
                 }
                 // The in-between made ahead for this pair (FrameExtrapolation.tryPrecompute): only
                 // sampled then, which takes the interpolation out of this display's render.
@@ -1405,7 +1411,9 @@ class Renderer {
 
         let renderPassDescriptor = MTLRenderPassDescriptor()
         renderPassDescriptor.colorAttachments[0].texture = renderTargetColor
-        renderPassDescriptor.colorAttachments[0].loadAction = .load
+        // Depth only: the color is not stored, so it need not be loaded either (loading it would
+        // read the whole drawable once more per display for nothing).
+        renderPassDescriptor.colorAttachments[0].loadAction = .dontCare
         renderPassDescriptor.colorAttachments[0].storeAction = .dontCare
         renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(red: 0.0, green: 0.0, blue: 0.0, alpha: chromaKeyEnabled ? 0.0 : 1.0)
         renderPassDescriptor.depthAttachment.texture = renderTargetDepth
@@ -1998,7 +2006,9 @@ class Renderer {
             guard let metalTexture = CVMetalTextureGetTexture(textureOut) else {
                 fatalError("CVMetalTextureGetTexture")
             }
-            if !((metalTexture.debugDescription?.contains("decompressedPixelFormat") ?? true) || (metalTexture.debugDescription?.contains("isCompressed = 1") ?? true)) && EventHandler.shared.totalFramesRendered % 90*5 == 0 {
+            // The frame counter first: debugDescription builds a long string, not to be paid per display.
+            if EventHandler.shared.totalFramesRendered % (90 * 5) == 0 && allowSecret
+                && !((metalTexture.debugDescription?.contains("decompressedPixelFormat") ?? true) || (metalTexture.debugDescription?.contains("isCompressed = 1") ?? true)) {
                 print("NO COMPRESSION ON VT FRAME!!!! AAAAAAAAA go file feedback again :(")
             }
             renderEncoder.setFragmentTexture(metalTexture, index: i)
@@ -2061,11 +2071,11 @@ class Renderer {
         for (i, texture) in blendTextures.prefix(2).enumerated() {
             renderEncoder.setFragmentTexture(texture, index: 3 + i)
         }
-        // Modes 1 and 2 read the previous frame; mode 3 (chosen motion, newer frame only) does not.
+        // Modes 1, 2 and 6 read the previous frame; mode 3 (chosen motion, newer frame only) does not.
         // Without the previous frame's textures mode 2 keeps the chosen motion as mode 3, mode 1 the
         // plain move.
-        if previousTextures.count != 2, let mode = frameExtrapolationState?.1.blendPrevious, mode == 1 || mode == 2 {
-            frameExtrapolationState?.1.blendPrevious = mode == 2 ? 3 : 0
+        if previousTextures.count != 2, let mode = frameExtrapolationState?.1.blendPrevious, mode == 1 || mode == 2 || mode == 6 {
+            frameExtrapolationState?.1.blendPrevious = mode == 1 ? 0 : 3
         }
         // The in-between made ahead (mode 4, private formats' shader), or a stand-in it never reads.
         if let made = frameInterpolationPrecomputed ?? boundTextures.first {

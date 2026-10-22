@@ -40,8 +40,12 @@ struct IdwtPush
 	float inv_resolution[2];
 	// ALVR: first threadgroup of a partial dispatch (see pyrowave_frame_decode). 0 for a full one.
 	int32_t tile_offset[2];
+	// ALVR: the output column is x * output_step + output_offset; Cb and Cr written interleaved
+	// into one texture (pyrowave_frame_decode) take steps of 2 at offsets 0 and 1.
+	int32_t output_step = 1;
+	int32_t output_offset = 0;
 };
-static_assert(sizeof(IdwtPush) == 24, "IdwtPush layout mismatch.");
+static_assert(sizeof(IdwtPush) == 32, "IdwtPush layout mismatch.");
 
 // How many decodes a caller may have in flight before acquiring a slot waits for the
 // oldest. Two would do for the intended display loop; four is headroom at ~1 MB per
@@ -606,9 +610,13 @@ pyrowave_result pyrowave_frame_decode(pyrowave_frame frame, pyrowave_mtl_command
 
 	id<MTLTexture> planes[3];
 	for (int i = 0; i < 3; i++)
-	{
 		planes[i] = (__bridge id<MTLTexture>)(buffers->planes[i]);
-		const int expected_width = i == 0 || !chroma_420 ? layout.width : layout.width / 2;
+	// ALVR: Cb and Cr given as one texture (the chroma plane of a biplanar pixel buffer, seen as
+	// one channel at twice the width): written interleaved, Cb at even and Cr at odd columns.
+	const bool interleaved_chroma = planes[1] && planes[1] == planes[2];
+	for (int i = 0; i < 3; i++)
+	{
+		const int expected_width = (i == 0 || !chroma_420 ? layout.width : layout.width / 2) * (i != 0 && interleaved_chroma ? 2 : 1);
 		const int expected_height = i == 0 || !chroma_420 ? layout.height : layout.height / 2;
 		if (!validate_plane(decoder->device, planes[i], i, expected_width, expected_height))
 			return PYROWAVE_ERROR_INVALID_ARGUMENT;
@@ -708,6 +716,9 @@ pyrowave_result pyrowave_frame_decode(pyrowave_frame frame, pyrowave_mtl_command
 
 				const bool writes_plane = level == g.final_level(c);
 				id<MTLTexture> output = writes_plane ? planes[c] : decoder->wavelet.component_ll_views[c][level - 1];
+				const bool interleave = writes_plane && c != 0 && interleaved_chroma;
+				push.output_step = interleave ? 2 : 1;
+				push.output_offset = interleave ? c - 1 : 0;
 
 				[enc setComputePipelineState:decoder->device->idwt_pipeline[writes_plane ? 1 : 0]];
 				[enc setBytes:&push length:sizeof(push) atIndex:0];

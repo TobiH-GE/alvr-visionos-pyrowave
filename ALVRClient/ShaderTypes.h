@@ -82,7 +82,9 @@ typedef struct
                              // 3: the newer frame moved along the choice only; 4 (Apple's private
                              // formats): the in-between made ahead (fxPrecomputeInBetween) at texture 7;
                              // 5: the frame moved forward by alpha along the NEXT frame's field
-                             // ("Predict with Streamer Vectors")
+                             // ("Predict with Streamer Vectors"); 6: as 3, with the previous frame
+                             // bound (textures 3, 4) for what the newer one covers
+                             // (frameInterpolationSelectedFill)
 } FrameExtrapolationUniform;
 
 // "Choose motion per pixel": picture pixels per block of the choice (fxSelectMotion).

@@ -660,6 +660,42 @@ static float2 frameInterpolationSelectedCoord(texture2d<float> motion, texture2d
     return clamp(y + a * (t - rotation), lo, hi) / fx.frameSize;
 }
 
+// Mode 6: mode 3, and where the newer frame does not show what the in-between does, the previous
+// frame. That is the background an object moved over (a railing post passing a far city: its
+// leading edge tore, Alyx 2026-10-22): the search for where the in-between's point lies in the
+// newer frame does not settle there, the newer point found moves somewhere else, since in the newer
+// frame the object covers it. The previous frame still shows it, moved along the background's
+// motion (of the field here and at the point found, the smaller scene motion) and the head
+// rotation. Faded in over 1.5-4.5 pixels of disagreement; elsewhere one video sample as mode 3.
+static half4 frameInterpolationSelectedFill(texture2d<float> motion, texture2d<float> selected, constant FrameExtrapolationUniform &fx,
+                                            float2 uv, texture2d<half> curY, texture2d<half> curUV,
+                                            texture2d<half> prevY, texture2d<half> prevUV, sampler colorSampler) {
+    const float2 coord = frameInterpolationSelectedCoord(motion, selected, fx, uv);
+    const half4 cur = sampleVideoFrame(curY, curUV, colorSampler, coord);
+    const float2 y = uv * fx.frameSize;
+    const uint2 cell = min(uint2(y / float(FX_SELECT_BLOCK)), uint2(selected.get_width() - 1, selected.get_height() - 1));
+    if (fx.blendPrevious != 6 || fx.alpha >= 0.0f || int(selected.read(cell).r + 0.5) != 0) {
+        return cur;
+    }
+    const float eyeWidth = fx.frameSize.x * 0.5;
+    const int eye = y.x >= eyeWidth ? 1 : 0;
+    const float2 p = coord * fx.frameSize;
+    const float4 fp = frameInterpolationField(motion, fx, p, eye);
+    const float off = length(p + fx.alpha * fp.rg - y);
+    if (off <= 1.5f) {
+        return cur;
+    }
+    constexpr sampler linearSampler(filter::linear, address::clamp_to_edge);
+    const float2 lo = float2(float(eye) * eyeWidth + 0.5, 0.5);
+    const float2 hi = float2(float(eye + 1) * eyeWidth - 0.5, fx.frameSize.y - 0.5);
+    const float4 fy = frameInterpolationField(motion, fx, y, eye);
+    const float2 background = dot(fy.rg, fy.rg) <= dot(fp.rg, fp.rg) ? fy.rg : fp.rg;
+    // Back from the in-between to the newer frame (-alpha of the way), then the whole step back.
+    const float2 xPrev = clamp(y - fx.alpha * background - background - fy.ba, lo, hi) / fx.frameSize;
+    const half4 prev = half4(prevY.sample(linearSampler, xPrev).r, prevUV.sample(linearSampler, xPrev).rg, 1.0h);
+    return mix(cur, prev, half(saturate((off - 1.5f) / 3.0f)));
+}
+
 // Frame interpolation with "choose motion per pixel": the motion chosen for this 4x4 block
 // (fxSelectMotion in FrameExtrapolation.metal, made once per frame), evaluated here per pixel so
 // it stays smooth across blocks. Choice 0, the streamer's field, is frameInterpolationBlend as is;
@@ -719,6 +755,8 @@ fragment half4 videoFrameFragmentShader_YpCbCrBiPlanar(ColorInOut in [[stage_in]
         ycbcr = frameInterpolationSelected(fxMotion, fxSelected, fx, sampleCoord, in_tex_y, in_tex_uv, prev_tex_y, prev_tex_uv, colorSampler);
     } else if (fx.alpha != 0.0f && fx.blendPrevious == 3) {
         ycbcr = sampleVideoFrame(in_tex_y, in_tex_uv, colorSampler, frameInterpolationSelectedCoord(fxMotion, fxSelected, fx, sampleCoord));
+    } else if (fx.alpha != 0.0f && fx.blendPrevious == 6) {
+        ycbcr = frameInterpolationSelectedFill(fxMotion, fxSelected, fx, sampleCoord, in_tex_y, in_tex_uv, prev_tex_y, prev_tex_uv, colorSampler);
     } else if (fx.alpha < 0.0f && fx.blendPrevious != 0) {
         ycbcr = frameInterpolationBlend(fxMotion, fx, sampleCoord, in_tex_y, in_tex_uv, prev_tex_y, prev_tex_uv, colorSampler);
     } else {
@@ -902,7 +940,8 @@ fragment half4 videoFrameFragmentShader_SecretYpCbCrFormats(ColorInOut in [[stag
     }
     if (fx.alpha > 0.0f && fx.blendPrevious == 5) {
         sampleCoord = frameInterpolationPredictCoord(fxMotion, fx, sampleCoord);
-    } else if (fx.alpha != 0.0f && fx.blendPrevious == 3) {
+    } else if (fx.alpha != 0.0f && (fx.blendPrevious == 3 || fx.blendPrevious == 6)) {
+        // (Mode 6 as 3 here: the previous frame is only bound for PyroWave's planes.)
         sampleCoord = frameInterpolationSelectedCoord(fxMotion, fxSelected, fx, sampleCoord);
     } else if (fx.alpha != 0.0f) {
         sampleCoord = frameExtrapolationCoord(fxMotion, fx, sampleCoord);

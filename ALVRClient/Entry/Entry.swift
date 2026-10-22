@@ -434,6 +434,16 @@ struct Entry: View {
                             saveAction()
                         }
 
+                        Toggle(isOn: $gStore.settings.frameInterpolationFillCovered) {
+                            Text("Interpolation: Fill Covered Areas from the Previous Frame")
+                            Text("Without Blend Both Frames: where an object moved over the background (a railing post passing a far city), the newer frame does not show what the in-between does there, and the post's leading edge tore. The previous frame fills it in. Costs one extra lookup of the motion field per pixel.")
+                                .font(.system(size: 10))
+                        }
+                        .toggleStyle(.switch)
+                        .onChange(of: gStore.settings.frameInterpolationFillCovered) {
+                            saveAction()
+                        }
+
                         Toggle(isOn: $gStore.settings.frameInterpolationSelect) {
                             Text("Interpolation: Choose Motion per Pixel")
                             Text("Once per new frame, every 8x8 pixels take whichever motion makes the two frames agree best on their PyroWave lowpass band (the motion field, head rotation only, none for HUD elements fixed to the view, optionally the neighbour cells' motion), on the headset's GPU. Fixes doubled and torn HUD text.")

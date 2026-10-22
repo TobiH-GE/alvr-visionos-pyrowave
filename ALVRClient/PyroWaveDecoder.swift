@@ -13,9 +13,12 @@
 //
 //  The rest of the client renders VideoToolbox output, i.e. biplanar YCbCr CVPixelBuffers.
 //  Luma is decoded straight into the luma plane of an IOSurface-backed 10-bit biplanar full
-//  range pixel buffer; Cb and Cr are decoded into private planes and interleaved into its
-//  chroma plane stripe by stripe. The finished buffer goes through the same frame queue,
-//  reprojection and foveation paths as a VideoToolbox frame.
+//  range pixel buffer, and Cb and Cr straight into its chroma plane: seen as one 16 bit channel
+//  at twice the width, Cb at the even and Cr at the odd columns (the decoder's last inverse
+//  wavelet pass writes them so). Where that view of the plane cannot be had, Cb and Cr are
+//  decoded into private planes and interleaved into it stripe by stripe instead. The finished
+//  buffer goes through the same frame queue, reprojection and foveation paths as a
+//  VideoToolbox frame.
 //
 //  Packet loss: a missing packet stops the stripe pipeline at that point (later stripes may
 //  depend on what it carried); the frame is then finished when its last packet or the next
@@ -162,6 +165,8 @@ final class PyroWaveDecoder {
         let lumaTexture: CVMetalTexture
         let chromaTexture: CVMetalTexture
         let luma: MTLTexture
+        // The chroma plane: one 16 bit channel at twice the width, Cb and Cr interleaved by the
+        // decoder (interleavedChroma), or rg16 for the interleave pass.
         let chroma: MTLTexture
         let packetCount: Int
         let firstPacketTime: CFTimeInterval
@@ -219,8 +224,11 @@ final class PyroWaveDecoder {
     private let pixelBufferPool: CVPixelBufferPool
     private let chromaWidth: Int
     private let chromaHeight: Int
-    private let cbTexture: MTLTexture
-    private let crTexture: MTLTexture
+    // Whether the decoder writes Cb and Cr straight into the pixel buffer's chroma plane; found
+    // with the first frame. Otherwise they go to these private planes and the interleave pass.
+    private var interleavedChroma = true
+    private var cbTexture: MTLTexture?
+    private var crTexture: MTLTexture?
     private var device: pyrowave_device?
     private var decoder: pyrowave_decoder?
     private var stripeCount = 0
@@ -310,20 +318,6 @@ final class PyroWaveDecoder {
             return nil
         }
         pixelBufferPool = pool
-
-        let chromaDescriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: .r16Unorm, width: chromaWidth, height: chromaHeight, mipmapped: false)
-        chromaDescriptor.usage = [.shaderRead, .shaderWrite]
-        chromaDescriptor.storageMode = .private
-        guard let cbTexture = mtlDevice.makeTexture(descriptor: chromaDescriptor),
-              let crTexture = mtlDevice.makeTexture(descriptor: chromaDescriptor) else {
-            pyroLog("PyroWave: chroma plane allocation failed")
-            return nil
-        }
-        cbTexture.label = "PyroWave Cb"
-        crTexture.label = "PyroWave Cr"
-        self.cbTexture = cbTexture
-        self.crTexture = crTexture
 
         let extensions: [CFString: Any] = [
             kCMFormatDescriptionExtension_YCbCrMatrix: kCMFormatDescriptionYCbCrMatrix_ITU_R_709_2,
@@ -497,10 +491,27 @@ final class PyroWaveDecoder {
         CVBufferSetAttachment(pixelBuffer, kCVImageBufferTransferFunctionKey, kCVImageBufferTransferFunction_ITU_R_709_2, .shouldPropagate)
         CVBufferSetAttachment(pixelBuffer, PyroWaveDecoder.frameAttachmentKey, kCFBooleanTrue, .shouldNotPropagate)
 
+        if interleavedChroma, makeWritableTexture(pixelBuffer, plane: 1, format: .r16Unorm, widthScale: 2, logFailure: false) == nil {
+            interleavedChroma = false
+            pyroLog("PyroWave: the chroma plane cannot be seen as one channel at twice the width; Cb and Cr get an interleave pass")
+        }
+        if !interleavedChroma && cbTexture == nil {
+            let chromaDescriptor = MTLTextureDescriptor.texture2DDescriptor(
+                pixelFormat: .r16Unorm, width: chromaWidth, height: chromaHeight, mipmapped: false)
+            chromaDescriptor.usage = [.shaderRead, .shaderWrite]
+            chromaDescriptor.storageMode = .private
+            cbTexture = mtlDevice.makeTexture(descriptor: chromaDescriptor)
+            crTexture = mtlDevice.makeTexture(descriptor: chromaDescriptor)
+            cbTexture?.label = "PyroWave Cb"
+            crTexture?.label = "PyroWave Cr"
+        }
         guard let lumaTexture = makeWritableTexture(pixelBuffer, plane: 0, format: .r16Unorm),
-              let chromaTexture = makeWritableTexture(pixelBuffer, plane: 1, format: .rg16Unorm),
+              let chromaTexture = interleavedChroma
+                ? makeWritableTexture(pixelBuffer, plane: 1, format: .r16Unorm, widthScale: 2)
+                : makeWritableTexture(pixelBuffer, plane: 1, format: .rg16Unorm),
               let luma = CVMetalTextureGetTexture(lumaTexture),
-              let chroma = CVMetalTextureGetTexture(chromaTexture) else {
+              let chroma = CVMetalTextureGetTexture(chromaTexture),
+              interleavedChroma || (cbTexture != nil && crTexture != nil) else {
             pyrowave_frame_end(handle)
             return nil
         }
@@ -549,10 +560,14 @@ final class PyroWaveDecoder {
         }
         commandBuffer.label = final ? "PyroWave last stripes" : "PyroWave stripes"
 
+        // Cb and Cr: the same texture, the pixel buffer's chroma plane, when the decoder
+        // interleaves them itself (it tells by the two being one).
+        let cb: MTLTexture = interleavedChroma ? frame.chroma : cbTexture!
+        let cr: MTLTexture = interleavedChroma ? frame.chroma : crTexture!
         var planes = pyrowave_gpu_buffers(planes: (
             Unmanaged.passUnretained(frame.luma as AnyObject).toOpaque(),
-            Unmanaged.passUnretained(cbTexture as AnyObject).toOpaque(),
-            Unmanaged.passUnretained(crTexture as AnyObject).toOpaque()))
+            Unmanaged.passUnretained(cb as AnyObject).toOpaque(),
+            Unmanaged.passUnretained(cr as AnyObject).toOpaque()))
         var progress = pyrowave_progress()
         let result = pyrowave_frame_decode(frame.handle, Unmanaged.passUnretained(commandBuffer as AnyObject).toOpaque(),
                                            &planes, Int32(completeStripes), final, &progress)
@@ -560,15 +575,15 @@ final class PyroWaveDecoder {
             pyroLog("PyroWave: decode step failed: \(String(cString: pyrowave_result_to_string(result)))")
         }
 
-        // Interleave the chroma rows this step finished into the pixel buffer's chroma plane.
+        // Without that: interleave the chroma rows this step finished into the chroma plane.
         let chromaRows = Int(min(progress.plane_rows.1, progress.plane_rows.2))
-        if result == PYROWAVE_SUCCESS, chromaRows > frame.chromaRowsInterleaved,
+        if !interleavedChroma, result == PYROWAVE_SUCCESS, chromaRows > frame.chromaRowsInterleaved,
            let encoder = commandBuffer.makeComputeCommandEncoder() {
             var firstRow = UInt32(frame.chromaRowsInterleaved)
             encoder.label = "PyroWave interleave chroma"
             encoder.setComputePipelineState(interleavePipeline)
-            encoder.setTexture(cbTexture, index: 0)
-            encoder.setTexture(crTexture, index: 1)
+            encoder.setTexture(cb, index: 0)
+            encoder.setTexture(cr, index: 1)
             encoder.setTexture(frame.chroma, index: 2)
             encoder.setBytes(&firstRow, length: MemoryLayout<UInt32>.size, index: 0)
             let threadWidth = interleavePipeline.threadExecutionWidth
@@ -620,16 +635,20 @@ final class PyroWaveDecoder {
         }
     }
 
-    private func makeWritableTexture(_ pixelBuffer: CVPixelBuffer, plane: Int, format: MTLPixelFormat) -> CVMetalTexture? {
+    // widthScale 2 sees a two channel plane as one channel at twice the width.
+    private func makeWritableTexture(_ pixelBuffer: CVPixelBuffer, plane: Int, format: MTLPixelFormat, widthScale: Int = 1,
+                                     logFailure: Bool = true) -> CVMetalTexture? {
         let attributes = [kCVMetalTextureUsage as String: MTLTextureUsage([.shaderRead, .shaderWrite]).rawValue] as CFDictionary
         var texture: CVMetalTexture?
         let status = CVMetalTextureCacheCreateTextureFromImage(
             nil, textureCache, pixelBuffer, attributes, format,
-            CVPixelBufferGetWidthOfPlane(pixelBuffer, plane),
+            CVPixelBufferGetWidthOfPlane(pixelBuffer, plane) * widthScale,
             CVPixelBufferGetHeightOfPlane(pixelBuffer, plane),
             plane, &texture)
         if status != kCVReturnSuccess {
-            pyroLog("PyroWave: CVMetalTextureCacheCreateTextureFromImage(plane \(plane)) failed: \(status)")
+            if logFailure {
+                pyroLog("PyroWave: CVMetalTextureCacheCreateTextureFromImage(plane \(plane)) failed: \(status)")
+            }
             return nil
         }
         return texture
